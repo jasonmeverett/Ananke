@@ -9,7 +9,7 @@ Created on Mon Dec  9 20:51:02 2019
 from numpy import *
 import pygmo as pg
 
-class prob_1D_collocation_trap():
+class prob_1D_helloCollocation():
     
     def __init__(self,npts=20,tof=1.0):
         self.npts = npts
@@ -108,11 +108,12 @@ class prob_1D_collocation_trap():
 
 def run_problem1():
     """
-    Example of a collocation method 1-D problem.
+    Example of a collocation method 1-D problem. Employs a trapezoidal
+    collocation method.
     """    
     
     # Problem definition
-    udp1 = prob_1D_collocation_trap(50,1.0)
+    udp1 = prob_1D_helloCollocation(50,1.0)
     prob = pg.problem(udp1)
     prob.c_tol = 1e-7
 

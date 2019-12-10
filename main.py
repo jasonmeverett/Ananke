@@ -10,7 +10,7 @@ from ananke.frames import *
 from ananke.orbit import *
 from ananke.planets import Moon, Earth
 from ananke.util import *
-from ananke.examples import run_problem1
+from ananke.examples import *
 
 # R1 = DCM_I_UEN(0,-90,degrees=True)
 # print(R1.apply([1,0,0]))
@@ -21,4 +21,4 @@ from ananke.examples import run_problem1
 # print(r)
 # print(v)
 
-run_problem1()
+run_problem2()
