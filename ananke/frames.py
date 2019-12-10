@@ -8,6 +8,30 @@ Created on Mon Dec  9 20:23:04 2019
 
 from scipy.spatial.transform import Rotation as R
 from numpy import *
+from ananke.planets import *
+
+# Get the inertial position of a landing site.
+def Pos_LS(lon,lat,alt,R_eq=1738e3,degrees=False):
+    """
+    Get the inertial position of a landing site based on planetary location.
+    Does not yet incorporate planetary rotation.
+    """
+
+    if degrees == True:
+        lon = lon*pi/180
+        lat = lat*pi/180
+    
+    # Grab the planetary rotation.
+    R_I_UEN = DCM_I_UEN(lon,lat)
+    
+    # Based on altitude
+    X_UEN = array([R_eq + alt, 0, 0])
+    
+    # Convert to inertial
+    X_I = R_I_UEN.inv().apply(X_UEN)
+    
+    return X_I
+    
 
 # Construct a DCM that represents the transformation from a planetary inertial
 # frame to an Up-East-North frame. Expects lat and lon in radians

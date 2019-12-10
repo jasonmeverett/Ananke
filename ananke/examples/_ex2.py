@@ -21,11 +21,11 @@ from scipy.linalg import norm
 class prob_2D_lander:
     
     # Function initialization
-    def __init__(self, npts=30):
-        self.X_initial=[ -330000, 15000.0, 1200, 0.0 ]
-        self.X_target = [0.0, 200.0, 0, -10.0]
+    def __init__(self, npts=30, tof=520.0, X_initial=[ -330000, 15000.0, 1200, 0.0 ], X_target = [0.0, 200.0, 0, -10.0]):
+        self.X_initial=X_initial
+        self.X_target = X_target
         self.npts = npts
-        self.tof = 520.0
+        self.tof = tof
         return
     
     def get_nic(self):
@@ -41,7 +41,6 @@ class prob_2D_lander:
     # Vy constraints
     def get_nec(self):
         return 8 + 4*(self.npts-1)
-    
     
     def get_bounds(self):
         
@@ -177,7 +176,6 @@ class prob_2D_lander:
             
             plt.show()
 
-
         # Return everything
         return OBJVAL + CONSTR_EQ + CONSTR_INEQ
 
@@ -188,7 +186,13 @@ def run_problem2():
     uniform gravity field. Employs a trapezoidal collocation method
     """
     
-    udp = prob_2D_lander(npts=30)
+    # Initial points
+    X_initial=[ -330000, 15000.0, 1200, 0.0 ]
+    X_target = [0.0, 200.0, 0, -10.0]
+    npts = 15
+    tof = 550.0
+    
+    udp = prob_2D_lander(npts=npts,tof=tof,X_initial=X_initial,X_target=X_target)
     prob = pg.problem(udp)
     prob.c_tol = 1e-4
     
@@ -198,7 +202,21 @@ def run_problem2():
     algo.extract(pg.nlopt).ftol_rel = 0
     algo.extract(pg.nlopt).maxeval = 500
     
-    pop = pg.population(prob,1000)
+    # Uncomment this for a good initial guess.
+    dt = tof/npts
+    X_g = list(linspace(X_initial[0], X_target[0], npts))
+    Y_g = list(linspace(X_initial[1], X_target[1], npts))
+    Vx_g = list(linspace(X_initial[2], X_target[2], npts))
+    Vy_g = list(linspace(X_initial[3], X_target[3], npts))
+    Ux_g = list([(Vx_g[ii+1] - Vx_g[ii])/dt for ii in range(0,npts-1)]) + [1.0]
+    Uy_g = list([(Vy_g[ii+1] - Vy_g[ii])/dt for ii in range(0,npts-1)]) + [1.0]
+    X0 = X_g + Vx_g + Ux_g + Y_g + Vy_g + Uy_g
+    
+    # Create population of 1.
+    pop = pg.population(prob)
+    pop.push_back(X0)
+    
+    # Evolve
     pop = algo.evolve(pop)
     
     is_feas = prob.feasibility_x(pop.champion_x)
