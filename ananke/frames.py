@@ -11,8 +11,17 @@ from numpy import *
 
 # Construct a DCM that represents the transformation from a planetary inertial
 # frame to an Up-East-North frame. Expects lat and lon in radians
-def DCM_I_UEN(lon,lat):
+def DCM_I_UEN(lon,lat,degrees=False):
+    """
+    Convert a latitude and a longitude to a UEN DCM.
+    X - Up 
+    Y - East
+    Z - North
+    """
     
+    if degrees == True:
+        lon = lon*pi/180
+        lat = lat*pi/180
     
     # First rotation is longitude along the Z-axis.
     R1 = R.from_dcm([
