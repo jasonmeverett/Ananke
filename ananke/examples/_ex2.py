@@ -28,10 +28,12 @@ class prob_2D_lander:
         self.X_target = X_target
         self.npts = npts
         self.tof = tof
+        self.lg = [0.0, -1.625] # Gravity accel vector
         return
     
+    # Thrust limiting
     def get_nic(self):
-        return 0
+        return self.npts
     
     def get_nec(self):
         return 8 + 4*(self.npts-1)
@@ -42,17 +44,17 @@ class prob_2D_lander:
         X_lb = [-400000]*self.npts
         X_ub = [0]*self.npts 
         Vx_lb = [0]*self.npts
-        Vx_ub = [1300]*self.npts
-        Ax_lb = [-10]*self.npts
-        Ax_ub = [10]*self.npts 
+        Vx_ub = [1700]*self.npts
+        Ax_lb = [-20]*self.npts
+        Ax_ub = [20]*self.npts 
         Y_lb = [0]*self.npts 
         Y_ub = [18000]*self.npts
         Vy_lb = [-1000]*self.npts
         Vy_ub = [1000]*self.npts
-        Ay_lb = [-10]*self.npts
-        Ay_ub = [10]*self.npts
-        LB = X_lb + Vx_lb + Ax_lb + Y_lb + Vy_lb + Ay_lb
-        UB = X_ub + Vx_ub + Ax_ub + Y_ub + Vy_ub + Ay_ub
+        Ay_lb = [-20]*self.npts
+        Ay_ub = [20]*self.npts
+        LB = X_lb + Vx_lb + Ax_lb + Y_lb + Vy_lb + Ay_lb + [300]
+        UB = X_ub + Vx_ub + Ax_ub + Y_ub + Vy_ub + Ay_ub + [800]
         return (LB,UB)
     
     def fitness(self, x):
@@ -64,7 +66,7 @@ class prob_2D_lander:
     def run_traj(self, x, plot_traj=0):
 
         nps         = self.npts
-        tof         = self.tof
+        tof         = x[6*nps]
         X_initial   = self.X_initial
         X_target    = self.X_target
         
@@ -79,9 +81,6 @@ class prob_2D_lander:
         Y       = x[(i0+3*nps)     :(i0+4*nps)    ]
         Vy      = x[(i0+4*nps)     :(i0+5*nps)    ]
         Ay      = x[(i0+5*nps)     :(i0+6*nps)    ]
-        
-        # Constant gravity vector
-        gvec = [0.0, -1.625]
         
         # Starting and ending constraints
         # Unscaled, because want within 1 meter for each
@@ -99,20 +98,29 @@ class prob_2D_lander:
         # Path equality constraints
         CONSTR_EQ = CONSTR_EQ + [(X[ii+1]-X[ii]) - 0.5*dt*(Vx[ii+1] + Vx[ii]) for ii in range(0,nps-1)]
         CONSTR_EQ = CONSTR_EQ + [(Y[ii+1]-Y[ii]) - 0.5*dt*(Vy[ii+1] + Vy[ii]) for ii in range(0,nps-1)]
-        CONSTR_EQ = CONSTR_EQ + [(Vx[ii+1]-Vx[ii]) - dt*gvec[0] - 0.5*dt*(Ax[ii+1] + Ax[ii]) for ii in range(0,nps-1)]
-        CONSTR_EQ = CONSTR_EQ + [(Vy[ii+1]-Vy[ii]) - dt*gvec[1] - 0.5*dt*(Ay[ii+1] + Ay[ii]) for ii in range(0,nps-1)]
+        CONSTR_EQ = CONSTR_EQ + [(Vx[ii+1]-Vx[ii]) - dt*self.lg[0] - 0.5*dt*(Ax[ii+1] + Ax[ii]) for ii in range(0,nps-1)]
+        CONSTR_EQ = CONSTR_EQ + [(Vy[ii+1]-Vy[ii]) - dt*self.lg[1] - 0.5*dt*(Ay[ii+1] + Ay[ii]) for ii in range(0,nps-1)]
             
         # Other objective - minimize control effort
-        objvals = [ 0.5*dt*( (Ax[ii]**2.0+Ay[ii]**2.0) + (Ax[ii+1]**2.0+Ay[ii+1]**2.0) ) for ii in range(0, nps-1) ]
-        OBJVAL = [ sum( objvals ) ]
+        fac = 1.0
+        OBJVAL = [ sum( [ 0.5*dt*( (Ax[ii]**2.0+Ay[ii]**2.0)**fac + (Ax[ii+1]**2.0+Ay[ii+1]**2.0)**fac ) for ii in range(0, nps-1) ] ) ]
+        
+        # Thrust limiting constraints
+        CONSTR_INEQ = [ Ax[ii]**2.0 + Ay[ii]**2.0 - 6.0**2.0 for ii in range(0,nps) ]
 
         # Plot results.
         if plot_traj == 1:
             
             t_arr = linspace(0.0,tof,nps)
+            sf = 0.8
             
             plt.figure(1)
-            plt.plot(0.001*X,0.001*Y,'*-r',linewidth=2.0)
+            plt.plot(0.001*X,0.001*Y,'*-b',linewidth=2.0)
+            for ii in range(0,nps):
+                Xs = [0.001*X[ii], 0.001*X[ii] + Ax[ii]*sf]
+                Ys = [0.001*Y[ii], 0.001*Y[ii] + Ay[ii]*sf]
+                plt.plot(Xs,Ys,'r',linewidth=1.0)
+                
             plt.minorticks_on()
             plt.grid(which='major', linestyle='-', linewidth='0.5')
             plt.grid(which='minor', linestyle=':', linewidth='0.5')
@@ -128,31 +136,49 @@ class prob_2D_lander:
             plt.grid(which='minor', linestyle=':', linewidth='0.5')
             plt.legend()
             plt.xlabel('Time (sec)')
-            plt.ylabel('Accel (m/s)')
+            plt.ylabel('Accel (m/s^2)')
             
             plt.show()
         
         # Return everything
-        return OBJVAL + CONSTR_EQ
+        return OBJVAL + CONSTR_EQ + CONSTR_INEQ
 
     def gradient(self, x):
 
         nps = self.npts
-        tof = self.tof
+        tof = x[6*nps]
         
         # Calculate dt
         dt = tof/float(nps)
     
         # Entire array zeroed out
-        grad = zeros((9 + 4*(nps-1), 6*nps))
+        grad = zeros((9 + 4*(nps-1) + nps, 6*nps+1))
         
-        # Cost function wrt. control params
+        # TOF Changes
+        fac = 1.0
+        J = sum( [ 0.5*dt*( (x[2*nps+ii]**2.0+x[5*nps+ii]**2.0)**fac + (x[2*nps+ii+1]**2.0+x[5*nps+ii+1]**2.0)**fac ) for ii in range(0, nps-1) ] )
+        npf = float(nps)
+        grad[0,6*nps] = J*1/x[6*nps]
+        grad[(9+0*(nps-1)):(9+1*(nps-1)),6*nps] = -0.5/npf*array([ (x[1*nps+ii+1]+x[1*nps+ii]) for ii in range(0,nps-1) ])
+        grad[(9+1*(nps-1)):(9+2*(nps-1)),6*nps] = -0.5/npf*array([ (x[4*nps+ii+1]+x[4*nps+ii]) for ii in range(0,nps-1) ])
+        grad[(9+2*(nps-1)):(9+3*(nps-1)),6*nps] = -0.5/npf*array([ (x[2*nps+ii+1]+x[2*nps+ii]) for ii in range(0,nps-1) ]) - self.lg[0]/npf*ones((nps-1,))
+        grad[(9+3*(nps-1)):(9+4*(nps-1)),6*nps] = -0.5/npf*array([ (x[5*nps+ii+1]+x[5*nps+ii]) for ii in range(0,nps-1) ]) - self.lg[1]/npf*ones((nps-1,))
+        
+        # This is for the minimum control problem.
         # Middle parameters are counted twice. Outer parameters are not.
         # Think of cost function as being expanded...
         grad[0,(2*nps):(3*nps)] = dt*x[(2*nps):(3*nps)]
         grad[0,(2*nps+1):(3*nps-1)] = grad[0,(2*nps+1):(3*nps-1)] + dt*x[(2*nps+1):(3*nps-1)]
         grad[0,(5*nps):(6*nps)] = dt*x[(5*nps):(6*nps)]
         grad[0,(5*nps+1):(6*nps-1)] = grad[0,(5*nps+1):(6*nps-1)] + dt*x[(5*nps+1):(6*nps-1)]
+        
+        # This is for the minimum effort problem.
+        # grad[0,2*nps] = 0.5*dt*x[2*nps]/sqrt(x[2*nps]**2.0 + x[5*nps]**2.0)
+        # grad[0,(2*nps+1):(3*nps-1)] = [dt*x[2*nps+ii]/sqrt(x[2*nps+ii]**2.0 + x[5*nps+ii]**2.0) for ii in range(1,nps-1)]
+        # grad[0,3*nps-1] = 0.5*dt*x[3*nps-1]/sqrt(x[3*nps-1]**2.0 + x[6*nps-1]**2.0)
+        # grad[0,5*nps] = 0.5*dt*x[5*nps]/sqrt(x[2*nps]**2.0 + x[5*nps]**2.0)
+        # grad[0,(5*nps+1):(6*nps-1)] = [dt*x[5*nps+ii]/sqrt(x[2*nps+ii]**2.0 + x[5*nps+ii]**2.0) for ii in range(1,nps-1)]
+        # grad[0,6*nps-1] = 0.5*dt*x[6*nps-1]/sqrt(x[3*nps-1]**2.0 + x[6*nps-1]**2.0)
         
         # Initial/final constraints wrt. state
         grad[1,0] = 1.0
@@ -173,14 +199,18 @@ class prob_2D_lander:
         grad[(9+2*(nps-1))  :(9+3*(nps-1)),     2*nps   :3*nps  ] = -0.5*dt*(eye(nps-1, M = nps, k = 0) + eye(nps-1, M = nps, k = 1))
         grad[(9+3*(nps-1))  :(9+4*(nps-1)),     4*nps   :5*nps  ] = -1.0*eye(nps-1, M = nps, k = 0) + eye(nps-1, M = nps, k = 1)
         grad[(9+3*(nps-1))  :(9+4*(nps-1)),     5*nps   :6*nps  ] = -0.5*dt*(eye(nps-1, M = nps, k = 0) + eye(nps-1, M = nps, k = 1))
-    
+        
+        # Thrust limiting constraints
+        grad[(9+4*(nps-1)+0*nps):(9+4*(nps-1)+1*nps),2*nps:3*nps] = 2.0*diag(x[2*nps:3*nps])
+        grad[(9+4*(nps-1)+0*nps):(9+4*(nps-1)+1*nps),5*nps:6*nps] = 2.0*diag(x[5*nps:6*nps])
+        
         # Reshape
-        grad = grad.reshape(( (9 + 4*(nps-1)) * (6*nps) , ))
+        grad = grad.reshape(( (9 + 4*(nps-1) + nps) * (6*nps+1) , ))
         
         return grad
 
 
-def run_problem2(npts=100,tof=650.0,X_initial=[ -330000, 15000.0, 1200, 0.0 ],X_target = [0.0, 200.0, 0, -10.0]):
+def run_problem2(npts=40,tof=621.0,X_initial=[ -330000, 15000.0, 1660, 0.0 ],X_target = [0.0, 200.0, 0, -10.0]):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method
@@ -188,13 +218,13 @@ def run_problem2(npts=100,tof=650.0,X_initial=[ -330000, 15000.0, 1200, 0.0 ],X_
     
     udp = prob_2D_lander(npts=npts,tof=tof,X_initial=X_initial,X_target=X_target)
     prob = pg.problem(udp)
-    prob.c_tol = [10]*4 + [1]*4 + [10]*2*(npts-1) + [1]*2*(npts-1)   
+    prob.c_tol = [1]*4 + [0.1]*4 + [1]*2*(npts-1) + [0.1]*2*(npts-1) + [0.01]*npts
     
     algo = pg.algorithm(pg.nlopt('slsqp'))
     algo.set_verbosity(20)
     algo.extract(pg.nlopt).xtol_rel = 0
     algo.extract(pg.nlopt).ftol_rel = 0
-    algo.extract(pg.nlopt).maxeval = 5000
+    algo.extract(pg.nlopt).maxeval = 1000
     
     # Uncomment this for a good initial guess.
     dt = tof/npts
@@ -204,7 +234,7 @@ def run_problem2(npts=100,tof=650.0,X_initial=[ -330000, 15000.0, 1200, 0.0 ],X_
     Vy_g = list(linspace(X_initial[3], X_target[3], npts))
     Ux_g = list([(Vx_g[ii+1] - Vx_g[ii])/dt for ii in range(0,npts-1)]) + [1.0]
     Uy_g = list([(Vy_g[ii+1] - Vy_g[ii])/dt for ii in range(0,npts-1)]) + [1.0]
-    X0 = X_g + Vx_g + Ux_g + Y_g + Vy_g + Uy_g
+    X0 = X_g + Vx_g + Ux_g + Y_g + Vy_g + Uy_g + [tof]
     
     # Create population of 1.
     pop = pg.population(prob)
@@ -215,6 +245,7 @@ def run_problem2(npts=100,tof=650.0,X_initial=[ -330000, 15000.0, 1200, 0.0 ],X_
     pop = algo.evolve(pop)
     t2 = time.clock()
     print("Solved time: %.8f"%(t2-t1))
+    print("TOF: %.3f\n"%(pop.champion_x[-1]))
     
     is_feas = prob.feasibility_x(pop.champion_x)
     if is_feas:
@@ -222,5 +253,6 @@ def run_problem2(npts=100,tof=650.0,X_initial=[ -330000, 15000.0, 1200, 0.0 ],X_
         print("FEASIBLE TRAJECTORY")
         print("===================")
         udp.summary(pop.champion_x)
+        
 
 
