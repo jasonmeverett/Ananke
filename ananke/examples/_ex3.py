@@ -111,7 +111,17 @@ class prob_3D_lander(object):
         return self.run_traj(x, plot_traj=1)
     
     def gradient(self, x):
-        return pg.estimate_gradient_h(lambda x: self.fitness(x), x, 1e-7)
+        
+        dt = self.tof/self.npts
+        
+        # The state vectors that effect the gradient are the accel terms.
+        grad = [0] * (6*self.npts)
+        grad = grad + [ dt*u for u in x[6*self.npts:] ]
+        
+        # Calculate the constraints 
+        
+        return grad
+        # return pg.estimate_gradient_h(lambda x: self.fitness(x), x, 1e-3)
     
     def run_traj(self, x, plot_traj=0):
         
@@ -155,8 +165,8 @@ class prob_3D_lander(object):
         vf = array([Vx[-1],Vy[-1],Vz[-1]])
         CONSTR_EQ = \
             list(r0-self.r0_LS) + \
-            list(v0-self.v0_LS) + \
             list(rf-self.rt_LS) + \
+            list(v0-self.v0_LS) + \
             list(vf-self.vt_LS)
             
         # Path equality constraints
@@ -209,7 +219,6 @@ class prob_3D_lander(object):
             plt.ylabel('Alt (km)')
             
             plt.show()
-            
 
         # Return everything
         return OBJVAL + CONSTR_EQ + CONSTR_INEQ
@@ -221,14 +230,14 @@ def run_problem3():
     uniform gravity field. Employs a trapezoidal collocation method
     """
     
-    x_optimal_output = 'x_optimal.txt'
+    x_optimal_output = 'x_optimal_new.txt'
     
-    npts = 15
+    npts = 10
     tof = 600
     
     udp = prob_3D_lander(npts,tof)
     prob = pg.problem(udp)
-    prob.c_tol = 1e-4
+    prob.c_tol = 1.0
     
     algo = pg.algorithm(pg.nlopt('slsqp'))
     algo.set_verbosity(1)
@@ -236,20 +245,20 @@ def run_problem3():
     algo.extract(pg.nlopt).ftol_rel = 0
     algo.extract(pg.nlopt).maxeval = 100
     
-    # r0_LS = array([ -11832.0089696, -304405.25545013,  0.0 ])
-    # v0_LS = array([ 293.82000729, 1666.3360656,  0.0  ])
-    # (X,Y,Z,Vx,Vy,Vz,Ux,Uy,Uz) = get_init_guess(r0_LS,v0_LS,[200,0,0],[-15,0,0],tof,npts)
-    # X0 = X + Y + Z + Vx + Vy + Vz + Ux + Uy + Uz
-    # pop = pg.population(prob)
-    # pop.push_back(X0)
+    r0_LS = array([ -11832.0089696, -304405.25545013,  0.0 ])
+    v0_LS = array([ 293.82000729, 1666.3360656,  0.0  ])
+    (X,Y,Z,Vx,Vy,Vz,Ux,Uy,Uz) = get_init_guess(r0_LS,v0_LS,[200,0,0],[-15,0,0],tof,npts)
+    X0 = X + Y + Z + Vx + Vy + Vz + Ux + Uy + Uz
+    pop = pg.population(prob)
+    pop.push_back(X0)
     
     # Initial guess from file.
-    content = []
-    with open(x_optimal_output) as f:
-        content = f.readlines() 
-    x_opt = [float(item) for item in content]
-    pop = pg.population(prob)
-    pop.push_back(x_opt)
+    # content = []
+    # with open(x_optimal_output) as f:
+    #     content = f.readlines() 
+    # x_opt = [float(item) for item in content]
+    # pop = pg.population(prob)
+    # pop.push_back(x_opt)
     
     # Uncomment for random population.
     # print("Constructing population...")

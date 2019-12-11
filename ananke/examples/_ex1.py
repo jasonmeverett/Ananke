@@ -8,6 +8,7 @@ Created on Mon Dec  9 20:51:02 2019
 
 from numpy import *
 import pygmo as pg
+from scipy.linalg import norm
 
 class prob_1D_helloCollocation():
     
@@ -30,11 +31,11 @@ class prob_1D_helloCollocation():
         LB = \
             [0] * self.npts + \
             [0] * self.npts + \
-            [-30] * self.npts 
+            [-10] * self.npts 
         UB = \
             [1] * self.npts + \
             [10] * self.npts + \
-            [30] * self.npts
+            [10] * self.npts
         return (LB, UB)
     
     def fitness(self,x):
@@ -75,7 +76,8 @@ class prob_1D_helloCollocation():
             CONSTR_EQ.append( (V[ii+1] - V[ii]) - 0.5*dt*(U[ii+1] + U[ii])  )
         
         # Objective value
-        OBJVAL = [sum([0.5*dt*(U[ii+1]**2.0 + U[ii]**2.0) for ii in range(0, self.npts-1)])]
+        fac = 2.0
+        OBJVAL = [sum([0.5*dt*norm(U[ii+1]**fac + U[ii]**fac) for ii in range(0, self.npts-1)])]
         
         # Plot trajectory
         if plot_traj == 1:
@@ -113,9 +115,9 @@ def run_problem1():
     """    
     
     # Problem definition
-    udp1 = prob_1D_helloCollocation(50,1.0)
+    udp1 = prob_1D_helloCollocation(20,1.0)
     prob = pg.problem(udp1)
-    prob.c_tol = 1e-7
+    prob.c_tol = 1e-5
 
     # Algorithm definition
     uda = pg.nlopt('slsqp')

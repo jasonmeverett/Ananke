@@ -138,14 +138,14 @@ class prob_2D_lander:
             
         # Path equality constraints
         for ii in range(0, self.npts-1):
-
-            # Velocity constraints
-            CONSTR_EQ.append( (Vx[ii+1]-Vx[ii]) - (dt*gvec[0] + 0.5*dt*(Ax[ii+1] + Ax[ii])) )
-            CONSTR_EQ.append( (Vy[ii+1]-Vy[ii]) - (dt*gvec[1] + 0.5*dt*(Ay[ii+1] + Ay[ii])) )
-            
             # Positional constraints
             CONSTR_EQ.append( (X[ii+1]-X[ii]) - 0.5*dt*(Vx[ii+1] + Vx[ii]) )
             CONSTR_EQ.append( (Y[ii+1]-Y[ii]) - 0.5*dt*(Vy[ii+1] + Vy[ii]) )
+            
+        for ii in range(0, self.npts-1):
+            # Velocity constraints
+            CONSTR_EQ.append( (Vx[ii+1]-Vx[ii]) - (dt*gvec[0] + 0.5*dt*(Ax[ii+1] + Ax[ii])) )
+            CONSTR_EQ.append( (Vy[ii+1]-Vy[ii]) - (dt*gvec[1] + 0.5*dt*(Ay[ii+1] + Ay[ii])) )   
             
         # Other objective - minimize control effort
         OBJVAL = [ sum( [ 0.5*dt*( (Ax[ii]**2.0+Ay[ii]**2.0) + (Ax[ii+1]**2.0+Ay[ii+1]**2.0) ) for ii in range(0, self.npts-1) ] ) ]
@@ -194,7 +194,7 @@ def run_problem2():
     
     udp = prob_2D_lander(npts=npts,tof=tof,X_initial=X_initial,X_target=X_target)
     prob = pg.problem(udp)
-    prob.c_tol = 1e-4
+    prob.c_tol = [10]*4 + [1]*4 + [10]*2*(npts-1) + [1]*2*(npts-1)   
     
     algo = pg.algorithm(pg.nlopt('slsqp'))
     algo.set_verbosity(20)
