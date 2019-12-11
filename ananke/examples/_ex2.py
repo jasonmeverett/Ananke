@@ -54,7 +54,7 @@ class prob_2D_lander:
         Ay_lb = [-20]*self.npts
         Ay_ub = [20]*self.npts
         LB = X_lb + Vx_lb + Ax_lb + Y_lb + Vy_lb + Ay_lb + [300]
-        UB = X_ub + Vx_ub + Ax_ub + Y_ub + Vy_ub + Ay_ub + [1200]
+        UB = X_ub + Vx_ub + Ax_ub + Y_ub + Vy_ub + Ay_ub + [800]
         return (LB,UB)
     
     def fitness(self, x):
@@ -105,10 +105,22 @@ class prob_2D_lander:
         OBJVAL = [ sum( [ 0.5*dt*( (Ax[ii]**2.0+Ay[ii]**2.0) + (Ax[ii+1]**2.0+Ay[ii+1]**2.0) ) for ii in range(0, nps-1) ] ) ]
         
         # Thrust limiting constraints
-        CONSTR_INEQ = [ Ax[ii]**2.0 + Ay[ii]**2.0 - 4.0**2.0 for ii in range(0,nps) ]
+        CONSTR_INEQ = [ Ax[ii]**2.0 + Ay[ii]**2.0 - 6.0**2.0 for ii in range(0,nps) ]
 
         # Plot results.
         if plot_traj == 1:
+                
+            mass0 = 20000
+            g0 = 9.81
+            isp = 300
+            m_arr = [mass0]
+            for ii in range(0,nps-1):
+                A = 0.5*(sqrt(Ax[ii]**2.0 + Ay[ii]**2.0) + sqrt(Ax[ii+1]**2.0 + Ay[ii+1]**2.0))
+                T = m_arr[ii]*A
+                mdot = T/(g0*isp)
+                m_arr = m_arr + [m_arr[ii]-mdot*dt]
+                
+            print("FINAL MASS: ", m_arr[-1])
             
             t_arr = linspace(0.0,tof,nps)
             sf = 0.8
@@ -200,7 +212,7 @@ class prob_2D_lander:
         return grad
 
 
-def run_problem2(npts=40,tof=621.0,X_initial=[ -380000, 15000.0, 1660, 0.0 ],X_target = [0.0, 200.0, 0, -10.0]):
+def run_problem2(npts=20,tof=520.05,X_initial=[ -370000, 15000.0, 1500, 0.0 ],X_target = [0.0, 200.0, 0, -10.0]):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method

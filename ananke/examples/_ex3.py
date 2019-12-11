@@ -185,8 +185,7 @@ class prob_3D_lander(object):
             CONSTR_EQ = CONSTR_EQ + list( (vkp1-vk) - 0.5*dt*((uk + ukp1) + (gk + gkp1)) )
 
         # Other objective - minimize control effort
-        objvals = [ 0.5*dt*( (Ux[ii]**2.0 + Uy[ii]**2.0 + Uz[ii]**2.0) + (Ux[ii+1]**2.0 + Uy[ii+1]**2.0 + Uz[ii+1]**2.0) ) for ii in range(0, self.npts-1) ]
-        OBJVAL = [ sum(objvals) ]
+        OBJVAL = [ sum([ 0.5*dt*( (Ux[ii]**2.0 + Uy[ii]**2.0 + Uz[ii]**2.0) + (Ux[ii+1]**2.0 + Uy[ii+1]**2.0 + Uz[ii+1]**2.0) ) for ii in range(0, self.npts-1) ]) ]
 
         # Plot, if enabled
         if plot_traj == 1:

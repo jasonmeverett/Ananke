@@ -81,6 +81,7 @@ class prob_1D_helloCollocation():
         
         # Plot trajectory
         if plot_traj == 1:
+            
             t_arr = linspace(0.0,self.tof,self.npts)
             plt.figure(1)
             
