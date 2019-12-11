@@ -43,7 +43,7 @@ class prob_2D_lander:
         # Set up here.
         X_lb = [-400000]*self.npts
         X_ub = [0]*self.npts 
-        Vx_lb = [0]*self.npts
+        Vx_lb = [-200]*self.npts
         Vx_ub = [1700]*self.npts
         Ax_lb = [-20]*self.npts
         Ax_ub = [20]*self.npts 
@@ -54,7 +54,7 @@ class prob_2D_lander:
         Ay_lb = [-20]*self.npts
         Ay_ub = [20]*self.npts
         LB = X_lb + Vx_lb + Ax_lb + Y_lb + Vy_lb + Ay_lb + [300]
-        UB = X_ub + Vx_ub + Ax_ub + Y_ub + Vy_ub + Ay_ub + [800]
+        UB = X_ub + Vx_ub + Ax_ub + Y_ub + Vy_ub + Ay_ub + [1200]
         return (LB,UB)
     
     def fitness(self, x):
@@ -102,11 +102,10 @@ class prob_2D_lander:
         CONSTR_EQ = CONSTR_EQ + [(Vy[ii+1]-Vy[ii]) - dt*self.lg[1] - 0.5*dt*(Ay[ii+1] + Ay[ii]) for ii in range(0,nps-1)]
             
         # Other objective - minimize control effort
-        fac = 1.0
-        OBJVAL = [ sum( [ 0.5*dt*( (Ax[ii]**2.0+Ay[ii]**2.0)**fac + (Ax[ii+1]**2.0+Ay[ii+1]**2.0)**fac ) for ii in range(0, nps-1) ] ) ]
+        OBJVAL = [ sum( [ 0.5*dt*( (Ax[ii]**2.0+Ay[ii]**2.0) + (Ax[ii+1]**2.0+Ay[ii+1]**2.0) ) for ii in range(0, nps-1) ] ) ]
         
         # Thrust limiting constraints
-        CONSTR_INEQ = [ Ax[ii]**2.0 + Ay[ii]**2.0 - 6.0**2.0 for ii in range(0,nps) ]
+        CONSTR_INEQ = [ Ax[ii]**2.0 + Ay[ii]**2.0 - 4.0**2.0 for ii in range(0,nps) ]
 
         # Plot results.
         if plot_traj == 1:
@@ -114,20 +113,20 @@ class prob_2D_lander:
             t_arr = linspace(0.0,tof,nps)
             sf = 0.8
             
+            # Trajectory arc
             plt.figure(1)
             plt.plot(0.001*X,0.001*Y,'*-b',linewidth=2.0)
             for ii in range(0,nps):
                 Xs = [0.001*X[ii], 0.001*X[ii] + Ax[ii]*sf]
                 Ys = [0.001*Y[ii], 0.001*Y[ii] + Ay[ii]*sf]
                 plt.plot(Xs,Ys,'r',linewidth=1.0)
-                
             plt.minorticks_on()
             plt.grid(which='major', linestyle='-', linewidth='0.5')
             plt.grid(which='minor', linestyle=':', linewidth='0.5')
             plt.xlabel('Downrange (km)')
             plt.ylabel('Altitude (km)')
 
-            
+            # Accelerations
             plt.figure(2)
             plt.plot(t_arr,Ax, '*-b',linewidth=2.0,label='Accel X')
             plt.plot(t_arr,Ay, '*-r',linewidth=2.0,label='Accel Y')
@@ -155,8 +154,7 @@ class prob_2D_lander:
         grad = zeros((9 + 4*(nps-1) + nps, 6*nps+1))
         
         # TOF Changes
-        fac = 1.0
-        J = sum( [ 0.5*dt*( (x[2*nps+ii]**2.0+x[5*nps+ii]**2.0)**fac + (x[2*nps+ii+1]**2.0+x[5*nps+ii+1]**2.0)**fac ) for ii in range(0, nps-1) ] )
+        J = sum( [ 0.5*dt*( (x[2*nps+ii]**2.0+x[5*nps+ii]**2.0)+ (x[2*nps+ii+1]**2.0+x[5*nps+ii+1]**2.0) ) for ii in range(0, nps-1) ] )
         npf = float(nps)
         grad[0,6*nps] = J*1/x[6*nps]
         grad[(9+0*(nps-1)):(9+1*(nps-1)),6*nps] = -0.5/npf*array([ (x[1*nps+ii+1]+x[1*nps+ii]) for ii in range(0,nps-1) ])
@@ -171,14 +169,6 @@ class prob_2D_lander:
         grad[0,(2*nps+1):(3*nps-1)] = grad[0,(2*nps+1):(3*nps-1)] + dt*x[(2*nps+1):(3*nps-1)]
         grad[0,(5*nps):(6*nps)] = dt*x[(5*nps):(6*nps)]
         grad[0,(5*nps+1):(6*nps-1)] = grad[0,(5*nps+1):(6*nps-1)] + dt*x[(5*nps+1):(6*nps-1)]
-        
-        # This is for the minimum effort problem.
-        # grad[0,2*nps] = 0.5*dt*x[2*nps]/sqrt(x[2*nps]**2.0 + x[5*nps]**2.0)
-        # grad[0,(2*nps+1):(3*nps-1)] = [dt*x[2*nps+ii]/sqrt(x[2*nps+ii]**2.0 + x[5*nps+ii]**2.0) for ii in range(1,nps-1)]
-        # grad[0,3*nps-1] = 0.5*dt*x[3*nps-1]/sqrt(x[3*nps-1]**2.0 + x[6*nps-1]**2.0)
-        # grad[0,5*nps] = 0.5*dt*x[5*nps]/sqrt(x[2*nps]**2.0 + x[5*nps]**2.0)
-        # grad[0,(5*nps+1):(6*nps-1)] = [dt*x[5*nps+ii]/sqrt(x[2*nps+ii]**2.0 + x[5*nps+ii]**2.0) for ii in range(1,nps-1)]
-        # grad[0,6*nps-1] = 0.5*dt*x[6*nps-1]/sqrt(x[3*nps-1]**2.0 + x[6*nps-1]**2.0)
         
         # Initial/final constraints wrt. state
         grad[1,0] = 1.0
@@ -210,7 +200,7 @@ class prob_2D_lander:
         return grad
 
 
-def run_problem2(npts=40,tof=621.0,X_initial=[ -330000, 15000.0, 1660, 0.0 ],X_target = [0.0, 200.0, 0, -10.0]):
+def run_problem2(npts=40,tof=621.0,X_initial=[ -380000, 15000.0, 1660, 0.0 ],X_target = [0.0, 200.0, 0, -10.0]):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method
@@ -252,7 +242,8 @@ def run_problem2(npts=40,tof=621.0,X_initial=[ -330000, 15000.0, 1660, 0.0 ],X_t
         print("===================")
         print("FEASIBLE TRAJECTORY")
         print("===================")
-        udp.summary(pop.champion_x)
+        
+    udp.summary(pop.champion_x)
         
 
 
