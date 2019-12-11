@@ -111,17 +111,7 @@ class prob_3D_lander(object):
         return self.run_traj(x, plot_traj=1)
     
     def gradient(self, x):
-        
-        dt = self.tof/self.npts
-        
-        # The state vectors that effect the gradient are the accel terms.
-        grad = [0] * (6*self.npts)
-        grad = grad + [ dt*u for u in x[6*self.npts:] ]
-        
-        # Calculate the constraints 
-        
-        return grad
-        # return pg.estimate_gradient_h(lambda x: self.fitness(x), x, 1e-3)
+        return pg.estimate_gradient_h(lambda x: self.fitness(x), x, 1e-3)
     
     def run_traj(self, x, plot_traj=0):
         
@@ -165,8 +155,8 @@ class prob_3D_lander(object):
         vf = array([Vx[-1],Vy[-1],Vz[-1]])
         CONSTR_EQ = \
             list(r0-self.r0_LS) + \
-            list(rf-self.rt_LS) + \
             list(v0-self.v0_LS) + \
+            list(rf-self.rt_LS) + \
             list(vf-self.vt_LS)
             
         # Path equality constraints
@@ -195,7 +185,8 @@ class prob_3D_lander(object):
             CONSTR_EQ = CONSTR_EQ + list( (vkp1-vk) - 0.5*dt*((uk + ukp1) + (gk + gkp1)) )
 
         # Other objective - minimize control effort
-        OBJVAL = [ sum( [ 0.5*dt*( (Ux[ii]**2.0 + Uy[ii]**2.0 + Uz[ii]**2.0) + (Ux[ii+1]**2.0 + Uy[ii+1]**2.0 + Uz[ii+1]**2.0) ) for ii in range(0, self.npts-1) ] ) ]
+        objvals = [ 0.5*dt*( (Ux[ii]**2.0 + Uy[ii]**2.0 + Uz[ii]**2.0) + (Ux[ii+1]**2.0 + Uy[ii+1]**2.0 + Uz[ii+1]**2.0) ) for ii in range(0, self.npts-1) ]
+        OBJVAL = [ sum(objvals) ]
 
         # Plot, if enabled
         if plot_traj == 1:
