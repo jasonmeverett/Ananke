@@ -365,28 +365,28 @@ class prob_3D_lander(object):
             plt.title('Position (Landing Site)')
             
             # Landing site position
-            Rx_LS = Rx - self.rt_I[0]
-            Ry_LS = Ry - self.rt_I[1]
-            Rz_LS = Rz - self.rt_I[2]
-            ax.plot(Ry_LS, Rz_LS, Rx_LS,'*-b')
+            # Rx_LS = Rx - self.rt_I[0]
+            # Ry_LS = Ry - self.rt_I[1]
+            # Rz_LS = Rz - self.rt_I[2]
+            # ax.plot(Ry_LS, Rz_LS, Rx_LS,'*-b')
             
-            # Rx_LS = Rx
-            # Ry_LS = Ry
-            # Rz_LS = Rz
-            # ax.plot(Rx, Ry, Rz,'*-b')
+            Rx_LS = Rx
+            Ry_LS = Ry
+            Rz_LS = Rz
+            ax.plot(Rx, Ry, Rz,'*-b')
             
             for ii in range(0,n):
-                fac = 30000
-                Xs = [Rx[ii]- self.rt_I[0], Rx[ii]- self.rt_I[0] + fac*Ux[ii]*Eta[ii]]
-                Ys = [Ry[ii]- self.rt_I[1], Ry[ii]- self.rt_I[1] + fac*Uy[ii]*Eta[ii]]
-                Zs = [Rz[ii]- self.rt_I[2], Rz[ii]- self.rt_I[2] + fac*Uz[ii]*Eta[ii]]
-                ax.plot(Ys,Zs,Xs,'r')
+                # fac = 30000
+                # Xs = [Rx[ii]- self.rt_I[0], Rx[ii]- self.rt_I[0] + fac*Ux[ii]*Eta[ii]]
+                # Ys = [Ry[ii]- self.rt_I[1], Ry[ii]- self.rt_I[1] + fac*Uy[ii]*Eta[ii]]
+                # Zs = [Rz[ii]- self.rt_I[2], Rz[ii]- self.rt_I[2] + fac*Uz[ii]*Eta[ii]]
+                # ax.plot(Ys,Zs,Xs,'r')
                 
-                # fac = 80000
-                # Xs = [Rx[ii], Rx[ii] + fac*Ux[ii]*Eta[ii]]
-                # Ys = [Ry[ii], Ry[ii] + fac*Uy[ii]*Eta[ii]]
-                # Zs = [Rz[ii], Rz[ii] + fac*Uz[ii]*Eta[ii]]
-                # ax.plot(Xs,Ys,Zs,'r')
+                fac = 80000
+                Xs = [Rx[ii], Rx[ii] + fac*Ux[ii]*Eta[ii]]
+                Ys = [Ry[ii], Ry[ii] + fac*Uy[ii]*Eta[ii]]
+                Zs = [Rz[ii], Rz[ii] + fac*Uz[ii]*Eta[ii]]
+                ax.plot(Xs,Ys,Zs,'r')
             
             plt.figure(2)
             plt.plot(t_arr,Eta,'*-b')
@@ -475,7 +475,7 @@ def run_problem3(npts=20,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
     algo.set_verbosity(100)
     algo.extract(pg.nlopt).xtol_rel = 0
     algo.extract(pg.nlopt).ftol_rel = 0
-    algo.extract(pg.nlopt).maxeval = 5000
+    algo.extract(pg.nlopt).maxeval = 2000
     
     # Initial guess from file.
     if from_file:
