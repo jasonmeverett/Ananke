@@ -2,7 +2,7 @@
 
 from numpy import *
 from scipy.linalg import norm
-
+import matplotlib.pyplot as plt
 
 def unit(v):
     v = array(v)
@@ -19,22 +19,27 @@ def r2d(r):
     return r*180/pi
 
 
-def recast_pts(data,npts):
+def interp_1d(dx, dy, x):
+    k = -1
+    for ii in range(0, len(dx)-1):
+        if x >= dx[ii]:
+            k = ii
+    y = dy[k] + (dy[k+1]-dy[k])/(dx[k+1]-dx[k])*(x-dx[k])
+    return y
+
+def recast_pts(data,npf):
     
-    dnew = data[0]
+    npo = len(data)
+    tarr_0 = linspace(0,npo,npo)
+    tarr_f = linspace(0,npo,npf)
+    data_new = [interp_1d(tarr_0,data,k) for k in tarr_f]
     
-    npts_original = len(data)
-    t_orig = linspace(0.0, 1.0, npts_original)
-    t_new = linspace(0.0, 1.0, npts)
-    
-    # Recast new points
-    jj = 0
-    for ii in range(0,npts):
-        if t_new[ii] > t_orig[jj]:
-            print("---> ", ii, " , ", jj)
-            jj = jj + 1
+    # plt.figure(1)
+    # plt.plot(tarr_0,data,'*-r')
+    # plt.plot(tarr_f,data_new,'>b')
+    # plt.show()
         
-    return
+    return data_new
 
 
 def get_init_guess(r0,v0,rt,vt,TOF,npts):

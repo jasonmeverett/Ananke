@@ -35,7 +35,7 @@ def Pos_LS(lon,lat,alt,R_eq=1738e3,degrees=False):
 
 # Construct a DCM that represents the transformation from a planetary inertial
 # frame to an Up-East-North frame. Expects lat and lon in radians
-def DCM_I_UEN(lon,lat,degrees=False):
+def Rot_PF_UEN(lon,lat,degrees=False):
     """
     Convert a latitude and a longitude to a UEN DCM.
     X - Up 
@@ -55,14 +55,37 @@ def DCM_I_UEN(lon,lat,degrees=False):
     
     # Second rotation is negative latitude along the new Y-axis.
     R2 = R.from_dcm([
-        [cos(-lat),0,-sin(-lat)],
+        [cos(lat),0,sin(lat)],
         [0,1,0],
-        [sin(-lat),0,cos(-lat)]])
+        [-sin(lat),0,cos(lat)]])
     
     # Combine rotations
     return R2*R1
 
+
+# Construct a DCM that represents the transformation from a planetary inertial
+# frame to a planetary-fixed frame. Rotation around the Z-axis.
+def Rot_I_PF(Om, ep, t,degrees=False):
+    """
+    Convert a latitude and a longitude to a UEN DCM.
+    X - Meridian
+    Z - North Pole
+    Y - Z x X
+    """
     
+    if degrees == True:
+        Om = Om*pi/180
     
+    # Calculate total rotation angle.
+    th = Om*(t-ep)
     
+    # First rotation is longitude along the Z-axis.
+    R1 = R.from_dcm([
+        [cos(th),sin(th),0],
+        [-sin(th),cos(th),0],
+        [0,0,1]])
+
+    
+    # Combine rotations
+    return R1   
     

@@ -121,6 +121,7 @@ class prob_2D_lander:
                 m_arr = m_arr + [m_arr[ii]-mdot*dt]
                 
             print("FINAL MASS: ", m_arr[-1])
+            print("TOF: ", tof)
             
             t_arr = linspace(0.0,tof,nps)
             sf = 0.8
@@ -226,7 +227,7 @@ def run_problem2(npts=20,tof=520.05,X_initial=[ -370000, 15000.0, 1500, 0.0 ],X_
     algo.set_verbosity(20)
     algo.extract(pg.nlopt).xtol_rel = 0
     algo.extract(pg.nlopt).ftol_rel = 0
-    algo.extract(pg.nlopt).maxeval = 1000
+    algo.extract(pg.nlopt).maxeval = 500
     
     # Uncomment this for a good initial guess.
     dt = tof/npts

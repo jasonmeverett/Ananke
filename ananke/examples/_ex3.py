@@ -21,6 +21,7 @@ from ananke.planets import *
 from numba import jit, jitclass
 from numba.extending import overload
 from mpl_toolkits.mplot3d import Axes3D
+import time
 
 class prob_3D_lander(object):
     
@@ -30,8 +31,6 @@ class prob_3D_lander(object):
         self.tof = config['tof']
         self.r0_I = config['r0_I']
         self.v0_I = config['v0_I']
-        self.rt_I = config['rt_I']
-        self.vt_I = config['vt_I']
         self.g0 = 9.81
         self.isp = config['isp']
         self.Tmax = config['Tmax']
@@ -40,7 +39,17 @@ class prob_3D_lander(object):
         self.Eta_ub = config['Eta_ub']
         self.mu = config['mu']
         self.R_eq = config['R_eq']
+        self.Om = config['Omega']
+        self.ep0 = config['Epoch']
+        self.LS_lat = config['LS_lat']
+        self.LS_lon = config['LS_lon']
+        self.LS_alt = config['LS_alt']
+        self.rt_LS = config['rt_LS']
+        self.vt_LS = config['vt_LS']
         
+        self.R_PF_UEN = Rot_PF_UEN(self.LS_lon, self.LS_lat, degrees=True)
+        self.R_UEN_PF = self.R_PF_UEN.inv()
+
         return
     
     def get_nic(self):
@@ -88,6 +97,7 @@ class prob_3D_lander(object):
         g0 = self.g0
         Eta_lb = self.Eta_lb
         Eta_ub = self.Eta_ub
+        Om = self.Om
         
         # Extract state information
         Rx      = x[(0*n)  :(1*n) ]
@@ -111,7 +121,7 @@ class prob_3D_lander(object):
         grad = zeros(arr_shape)
         
         # Gradient estimation
-        # grade = pg.estimate_gradient(lambda x: self.fitness(x), x, 1e-5)
+        # grade = pg.estimate_gradient_h(lambda x: self.fitness(x), x, 1e-5)
         # arre = grade.reshape(arr_shape)
         
         # Matrices to use later
@@ -129,7 +139,7 @@ class prob_3D_lander(object):
         grad[0,(10*n):(11*n)] = dJ_dEta 
         grad[0,(11*n)] = dJ_dT
 
-        # Initial/Final state constraints
+        # Initial state constraints
         grad[1,0*n] = 1.0
         grad[2,1*n] = 1.0
         grad[3,2*n] = 1.0
@@ -137,13 +147,33 @@ class prob_3D_lander(object):
         grad[5,4*n] = 1.0
         grad[6,5*n] = 1.0
         grad[7,9*n] = 1.0
+        
+        # Final state constraints
         grad[ 8,1*n-1] = 1.0
         grad[ 9,2*n-1] = 1.0
         grad[10,3*n-1] = 1.0
         grad[11,4*n-1] = 1.0
         grad[12,5*n-1] = 1.0
         grad[13,6*n-1] = 1.0
+        
+        R_I_PF = Rot_I_PF(self.Om, self.ep0, tof)
+        R_UEN_I = R_I_PF.inv() * self.R_UEN_PF
+        rLS_I = R_UEN_I.apply([self.R_eq + self.LS_alt,0,0])
+        rt_I = rLS_I + R_UEN_I.apply(self.rt_LS)
+        vt_I = R_UEN_I.apply(self.vt_LS) + cross([0,0,self.Om],rt_I)
+        
+        Omvec = array([0,0,Om])
+        dRf_dt = -cross(Omvec, rt_I)
+        dVf_dt = -cross(Omvec, vt_I)
+        grad[ 8:11,11*n] = dRf_dt
+        grad[10:13,11*n] = dVf_dt
 
+        # print(arre[ 8:11,11*n])
+        # print(grad[ 8:11,11*n])
+        # print('grad')
+        # print(arre[11:14,11*n])
+        # print(grad[10:14,11*n])
+        
         # Path equality constraints - Position
         dRxp_dRx = dbeyeneg
         dRyp_dRy = dbeyeneg
@@ -319,6 +349,13 @@ class prob_3D_lander(object):
         # Collocation timestep
         dt = tof/nf
 
+        # Landing site position
+        R_I_PF = Rot_I_PF(self.Om, self.ep0, tof)
+        R_UEN_I = R_I_PF.inv() * self.R_UEN_PF
+        rLS_I = R_UEN_I.apply([self.R_eq + self.LS_alt,0,0])
+        rt_I = rLS_I + R_UEN_I.apply(self.rt_LS)
+        vt_I = R_UEN_I.apply(self.vt_LS) + cross([0,0,self.Om],rt_I)
+        
         # Starting and ending constraints
         r0 = array([Rx[0],Ry[0],Rz[0]])
         v0 = array([Vx[0],Vy[0],Vz[0]])
@@ -328,8 +365,8 @@ class prob_3D_lander(object):
             list(r0-self.r0_I) + \
             list(v0-self.v0_I) + \
             [m[0] - self.mass0] + \
-            list(rf-self.rt_I) + \
-            list(vf-self.vt_I)
+            list(rf-rt_I) + \
+            list(vf-vt_I)
             
         # Equality path constraints
         Rxp = [(Rx[k+1]-Rx[k]) - 0.5*dt*(Vx[k]+Vx[k+1]) for k in range(0,n-1)]
@@ -370,42 +407,39 @@ class prob_3D_lander(object):
             alt = [norm([Rx[k], Ry[k], Rz[k]]) - self.R_eq for k in range(0,n) ]
             
             # Landing site position
-            X = Rx - self.rt_I[0]
-            Y = Ry - self.rt_I[1]
-            Z = Rz - self.rt_I[2]
+            X = Rx - rt_I[0]
+            Y = Ry - rt_I[1]
+            Z = Rz - rt_I[2]
             
-            max_range = array([X.max()-X.min(), Y.max()-Y.min(), Z.max()-Z.min()]).max()
-            Xb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(X.max()+X.min())
-            Yb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(Y.max()+Y.min())
-            Zb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(Z.max()+Z.min())
-            # Comment or uncomment following both lines to test the fake bounding box:
-            for xb, yb, zb in zip(Xb, Yb, Zb):
-               ax.plot([yb], [zb], [xb], 'w')
+            # max_range = array([X.max()-X.min(), Y.max()-Y.min(), Z.max()-Z.min()]).max()
+            # Xb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(X.max()+X.min())
+            # Yb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(Y.max()+Y.min())
+            # Zb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(Z.max()+Z.min())
+            # # Comment or uncomment following both lines to test the fake bounding box:
+            # for xb, yb, zb in zip(Xb, Yb, Zb):
+            #    ax.plot([yb], [zb], [xb], 'w')
             
             ax.plot(Y, Z, X,'*-b')
-            
-            
-            
-            # Rx_LS = Rx
-            # Ry_LS = Ry
-            # Rz_LS = Rz
-            # ax.plot(Rx, Ry, Rz,'*-b')
+
+            fout = open('OUT.csv', 'w+')
+            fout.write('Time,Alt,Eta,Mass,rLSx,rLSy,rLSz,vLSx,vLSy,vLSz\n')
+            for ii in range(0,n):
+                outstr = ","
+                outstr = outstr.join([ '%.20f'%(ll) for ll in [t_arr[ii],alt[ii],Eta[ii],m[ii],\
+                                      Rx[ii]-rt_I[0],Ry[ii]-rt_I[1],Rz[ii]-rt_I[2],\
+                                      Vx[ii]-vt_I[0],Vy[ii]-vt_I[1],Vz[ii]-vt_I[2] ] ]+ ["\n"] )
+                fout.write(outstr)
+            fout.close()
             
             for ii in range(0,n):
                 fac = 150000
-                Xs = [Rx[ii]- self.rt_I[0], Rx[ii]- self.rt_I[0] + fac*Ux[ii]*Eta[ii]]
-                # Xs = [X[ii], X[ii] + fac*Ux[ii]*Eta[ii]]
-                Ys = [Ry[ii]- self.rt_I[1], Ry[ii]- self.rt_I[1] + fac*Uy[ii]*Eta[ii]]
-                Zs = [Rz[ii]- self.rt_I[2], Rz[ii]- self.rt_I[2] + fac*Uz[ii]*Eta[ii]]
+                Xs = [Rx[ii]- rt_I[0], Rx[ii]- rt_I[0] + fac*Ux[ii]*Eta[ii]]
+                Ys = [Ry[ii]- rt_I[1], Ry[ii]- rt_I[1] + fac*Uy[ii]*Eta[ii]]
+                Zs = [Rz[ii]- rt_I[2], Rz[ii]- rt_I[2] + fac*Uz[ii]*Eta[ii]]
                 ax.plot(Ys,Zs,Xs,'r')
-                
-                # fac = 80000
-                # Xs = [Rx[ii], Rx[ii] + fac*Ux[ii]*Eta[ii]]
-                # Ys = [Ry[ii], Ry[ii] + fac*Uy[ii]*Eta[ii]]
-                # Zs = [Rz[ii], Rz[ii] + fac*Uz[ii]*Eta[ii]]
-                # ax.plot(Xs,Ys,Zs,'r')
-            
+
             plt.figure(2)
+            plt.subplot(2,2,1)
             plt.plot(t_arr,Eta,'*-b')
             plt.minorticks_on()
             plt.grid(which='major', linestyle='-', linewidth='0.5')
@@ -414,8 +448,8 @@ class prob_3D_lander(object):
             plt.ylabel('Throttle (-)')
             plt.title('Throttle')
             
-            
-            plt.figure(3)
+            plt.figure(2)
+            plt.subplot(2,2,2)
             plt.plot(t_arr, alt,'*-b')
             plt.minorticks_on()
             plt.grid(which='major', linestyle='-', linewidth='0.5')
@@ -424,8 +458,18 @@ class prob_3D_lander(object):
             plt.ylabel('Alt (km)')
             plt.title('Altitude')
             
-            print("FINAL MASS: %.3F KG"%(m[-1]))
+            plt.figure(2)
+            plt.subplot(2,2,3)
+            plt.plot(t_arr, m,'*-b')
+            plt.minorticks_on()
+            plt.grid(which='major', linestyle='-', linewidth='0.5')
+            plt.grid(which='minor', linestyle=':', linewidth='0.5')
+            plt.xlabel('Time (sec)')
+            plt.ylabel('Mass (kg)')
+            plt.title('Mass')
             
+            print("FINAL MASS: %.3f kg"%(m[-1]))
+            print("TOF:        %.3f sec"%(tof))
             plt.show()
 
             # Altitude
@@ -436,13 +480,14 @@ class prob_3D_lander(object):
 
 
 # TODO: Add omega x r terms for rotating planet
-def run_problem3(npts=30,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
+def run_problem3(npts=40,tof=600,mass0=20000,isp=300,Tmax=66000):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method
     """
     config = {}
     x_optimal_output = 'x_optimal_new.txt'
+    file_npts = 30
     from_file = True
     to_file = True
 
@@ -457,8 +502,10 @@ def run_problem3(npts=30,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
     config['Tmax'] = Tmax
     config['tof'] = tof
     config['Eta_lb'] = 0.2
-    config['Eta_ub'] = 0.8
+    config['Eta_ub'] = 1.0
     config['R_eq'] = R_eq
+    config['Omega'] = 2*pi/(27.322*86400.0)
+    config['Epoch'] = 0.0
     
     # Initial state
     ra = R_eq+100000
@@ -473,15 +520,10 @@ def run_problem3(npts=30,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
     config['LS_lon'] = 0.0
     config['LS_lat'] = 0.0
     config['LS_alt'] = 0.0
-    R_I_UEN = DCM_I_UEN(config['LS_lon'], config['LS_lat'], degrees=True)
-    config['rLS_I'] = Pos_LS(config['LS_lon'], config['LS_lat'], config['LS_alt'], R_eq, degrees=True)
-    config['vLS_I'] = [0,0,0]
     
-    # Target position/velocity
+    # Target position/velocity wrt. UEN frame on surface.
     config['rt_LS'] = [200,0,0]
     config['vt_LS'] = [-15,0,0]
-    config['rt_I'] = config['rLS_I'] + R_I_UEN.inv().apply(config['rt_LS'])
-    config['vt_I'] = R_I_UEN.inv().apply(config['vt_LS'])
     
     # Problem configuration
     udp = prob_3D_lander(config)
@@ -489,10 +531,10 @@ def run_problem3(npts=30,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
     prob.c_tol = 1e-3
     
     algo = pg.algorithm(pg.nlopt('slsqp'))
-    algo.set_verbosity(100)
+    algo.set_verbosity(10)
     algo.extract(pg.nlopt).xtol_rel = 0
     algo.extract(pg.nlopt).ftol_rel = 0
-    algo.extract(pg.nlopt).maxeval = 10000
+    algo.extract(pg.nlopt).maxeval = 500
     
     # Initial guess from file.
     if from_file:
@@ -501,13 +543,28 @@ def run_problem3(npts=30,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
         with open(x_optimal_output) as f:
             content = f.readlines() 
         X0 = [float(item) for item in content]
+        
+        if not (npts == file_npts):
+            X0new = []
+            for ii in range(0,11):
+                X0new = X0new + recast_pts(X0[ii*file_npts:(ii+1)*file_npts],npts) 
+            X0 = X0new + [X0[-1]]
     
     # Initial guess - linear profile
     else:
+        
+        R_PF_UEN = Rot_PF_UEN(config['LS_lon'], config['LS_lat'], degrees=True)
+        R_UEN_PF = R_PF_UEN.inv()
+        R_I_PF = Rot_I_PF(config['Omega'], config['Epoch'], tof)
+        R_UEN_I = R_I_PF.inv() * R_UEN_PF
+        rLS_I = R_UEN_I.apply([R_eq + config['LS_alt'],0,0])
+        rt_I = rLS_I + R_UEN_I.apply(config['rt_LS'])
+        vt_I = R_UEN_I.apply(config['vt_LS']) + cross([0,0,config['Omega']],rt_I)
+        
         print('LINEAR INITIAL GUESS')
         dt = tof/npts
-        R = linspace(config['r0_I'], config['rt_I'], npts).transpose()
-        V = linspace(config['v0_I'], config['vt_I'], npts).transpose()
+        R = linspace(config['r0_I'], rt_I, npts).transpose()
+        V = linspace(config['v0_I'], vt_I, npts).transpose()
         Ux = [1.0] + [(V[0,k+1] - V[0,k])/dt for k in range(0,npts-1)]
         Uy = [1.0] + [(V[1,k+1] - V[1,k])/dt for k in range(0,npts-1)]
         Uz = [1.0] + [(V[2,k+1] - V[2,k])/dt for k in range(0,npts-1)]
@@ -525,7 +582,7 @@ def run_problem3(npts=30,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
 
     # Evolve
     print("Evolving...")
-    # pop = algo.evolve(pop)
+    pop = algo.evolve(pop)
 
     # Check feasibility
     is_feas = prob.feasibility_x(pop.champion_x)
