@@ -362,31 +362,48 @@ class prob_3D_lander(object):
             
             fig = plt.figure(1)
             ax = fig.gca(projection='3d')
+            ax.set_xlim(-400000,400000)
+            ax.set_ylim(-40000,40000)
+            ax.set_zlim(-100000,100000)
             plt.title('Position (Landing Site)')
             
-            # Landing site position
-            # Rx_LS = Rx - self.rt_I[0]
-            # Ry_LS = Ry - self.rt_I[1]
-            # Rz_LS = Rz - self.rt_I[2]
-            # ax.plot(Ry_LS, Rz_LS, Rx_LS,'*-b')
+            alt = [norm([Rx[k], Ry[k], Rz[k]]) - self.R_eq for k in range(0,n) ]
             
-            Rx_LS = Rx
-            Ry_LS = Ry
-            Rz_LS = Rz
-            ax.plot(Rx, Ry, Rz,'*-b')
+            # Landing site position
+            X = Rx - self.rt_I[0]
+            Y = Ry - self.rt_I[1]
+            Z = Rz - self.rt_I[2]
+            
+            max_range = array([X.max()-X.min(), Y.max()-Y.min(), Z.max()-Z.min()]).max()
+            Xb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(X.max()+X.min())
+            Yb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(Y.max()+Y.min())
+            Zb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(Z.max()+Z.min())
+            # Comment or uncomment following both lines to test the fake bounding box:
+            for xb, yb, zb in zip(Xb, Yb, Zb):
+               ax.plot([yb], [zb], [xb], 'w')
+            
+            ax.plot(Y, Z, X,'*-b')
+            
+            
+            
+            # Rx_LS = Rx
+            # Ry_LS = Ry
+            # Rz_LS = Rz
+            # ax.plot(Rx, Ry, Rz,'*-b')
             
             for ii in range(0,n):
-                # fac = 30000
-                # Xs = [Rx[ii]- self.rt_I[0], Rx[ii]- self.rt_I[0] + fac*Ux[ii]*Eta[ii]]
-                # Ys = [Ry[ii]- self.rt_I[1], Ry[ii]- self.rt_I[1] + fac*Uy[ii]*Eta[ii]]
-                # Zs = [Rz[ii]- self.rt_I[2], Rz[ii]- self.rt_I[2] + fac*Uz[ii]*Eta[ii]]
-                # ax.plot(Ys,Zs,Xs,'r')
+                fac = 150000
+                Xs = [Rx[ii]- self.rt_I[0], Rx[ii]- self.rt_I[0] + fac*Ux[ii]*Eta[ii]]
+                # Xs = [X[ii], X[ii] + fac*Ux[ii]*Eta[ii]]
+                Ys = [Ry[ii]- self.rt_I[1], Ry[ii]- self.rt_I[1] + fac*Uy[ii]*Eta[ii]]
+                Zs = [Rz[ii]- self.rt_I[2], Rz[ii]- self.rt_I[2] + fac*Uz[ii]*Eta[ii]]
+                ax.plot(Ys,Zs,Xs,'r')
                 
-                fac = 80000
-                Xs = [Rx[ii], Rx[ii] + fac*Ux[ii]*Eta[ii]]
-                Ys = [Ry[ii], Ry[ii] + fac*Uy[ii]*Eta[ii]]
-                Zs = [Rz[ii], Rz[ii] + fac*Uz[ii]*Eta[ii]]
-                ax.plot(Xs,Ys,Zs,'r')
+                # fac = 80000
+                # Xs = [Rx[ii], Rx[ii] + fac*Ux[ii]*Eta[ii]]
+                # Ys = [Ry[ii], Ry[ii] + fac*Uy[ii]*Eta[ii]]
+                # Zs = [Rz[ii], Rz[ii] + fac*Uz[ii]*Eta[ii]]
+                # ax.plot(Xs,Ys,Zs,'r')
             
             plt.figure(2)
             plt.plot(t_arr,Eta,'*-b')
@@ -397,7 +414,7 @@ class prob_3D_lander(object):
             plt.ylabel('Throttle (-)')
             plt.title('Throttle')
             
-            alt = [norm([Rx[k], Ry[k], Rz[k]]) - self.R_eq for k in range(0,n) ]
+            
             plt.figure(3)
             plt.plot(t_arr, alt,'*-b')
             plt.minorticks_on()
@@ -419,7 +436,7 @@ class prob_3D_lander(object):
 
 
 # TODO: Add omega x r terms for rotating planet
-def run_problem3(npts=20,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
+def run_problem3(npts=30,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method
@@ -448,7 +465,7 @@ def run_problem3(npts=20,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
     rp = R_eq+15000
     sma = 0.5*(ra+rp)
     ecc = (ra-rp)/(ra+rp)
-    r,v = elts_to_rv(sma,ecc,d2r(0.0),d2r(0.0),d2r(-15.0),0.0,config['mu'])
+    r,v = elts_to_rv(sma,ecc,d2r(3.0),d2r(3.0),d2r(-18.0),0.0,config['mu'])
     config['r0_I'] = r
     config['v0_I'] = v
     
@@ -475,7 +492,7 @@ def run_problem3(npts=20,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
     algo.set_verbosity(100)
     algo.extract(pg.nlopt).xtol_rel = 0
     algo.extract(pg.nlopt).ftol_rel = 0
-    algo.extract(pg.nlopt).maxeval = 2000
+    algo.extract(pg.nlopt).maxeval = 10000
     
     # Initial guess from file.
     if from_file:
@@ -508,7 +525,7 @@ def run_problem3(npts=20,tof=600,mass0=20000,isp=300,Tmax=1.3*66000):
 
     # Evolve
     print("Evolving...")
-    pop = algo.evolve(pop)
+    # pop = algo.evolve(pop)
 
     # Check feasibility
     is_feas = prob.feasibility_x(pop.champion_x)
