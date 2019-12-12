@@ -143,7 +143,7 @@ class prob_2D_lander_mass:
         if plot_traj == 1:
             
             t_arr = linspace(0.0,tof,nps)
-            sf = 4.0
+            sf = 5.0
             
             # Trajectory arc
             plt.figure(1)
@@ -344,7 +344,7 @@ class prob_2D_lander_mass:
         return grad
 
 
-def run_problem4(npts=30,tof=550.0,X_initial=[ -370000, 15000.0, 1500, 0.0 ],X_target = [0.0, 200.0, 0, -10.0],mass0=20000,tmax=1.3*66000,isp=300):
+def run_problem4(npts=40,tof=550.0,X_initial=[ -370000, 15000.0, 1500, 0.0 ],X_target = [0.0, 200.0, 0, -10.0],mass0=20000,tmax=1.3*66000,isp=300):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method
@@ -358,8 +358,8 @@ def run_problem4(npts=30,tof=550.0,X_initial=[ -370000, 15000.0, 1500, 0.0 ],X_t
     uda.set_verbosity(50)
     uda.extract(pg.nlopt).xtol_rel = 0
     uda.extract(pg.nlopt).ftol_rel = 0
-    uda.extract(pg.nlopt).maxeval = 2000
-    uda2 = pg.mbh(uda, stop=2, perturb=0.1)
+    uda.extract(pg.nlopt).maxeval = 5000
+    uda2 = pg.mbh(uda, stop=3, perturb=0.5)
     algo = pg.algorithm(uda2)
     
     # Uncomment this for a good initial guess.
@@ -371,7 +371,7 @@ def run_problem4(npts=30,tof=550.0,X_initial=[ -370000, 15000.0, 1500, 0.0 ],X_t
     Vy_g = list(linspace(X_initial[3], X_target[3], npts))
     Uy_g = [0.0]*npts
     m = list(linspace(mass0,0.6*mass0,npts))
-    T = [0.2]*5 + [0.8]*25
+    T = [0.2]*10 + [0.8]*30
     # T = list(linspace(0.8,0.2,npts))
     
     X0 = X_g + Vx_g + Ux_g + Y_g + Vy_g + Uy_g + m + T + [tof]
@@ -382,7 +382,7 @@ def run_problem4(npts=30,tof=550.0,X_initial=[ -370000, 15000.0, 1500, 0.0 ],X_t
     
     # Evolve
     t1 = time.clock()
-    pop = uda.evolve(pop)
+    pop = algo.evolve(pop)
     t2 = time.clock()
     print("Solved time: %.8f"%(t2-t1))
     print("TOF: %.3f\n"%(pop.champion_x[-1]))
