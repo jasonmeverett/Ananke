@@ -8,4 +8,4 @@ Created on Mon Dec  9 20:38:41 2019
 
 from ananke.examples import *
 
-run_problem4()
+run_problem3()
