@@ -7,5 +7,6 @@ Created on Mon Dec  9 20:38:41 2019
 """
 
 from ananke.examples import *
+import json
 
-run_problem3()
+run_problem3('inputfiles/config_col_lander_3D_trap.json')

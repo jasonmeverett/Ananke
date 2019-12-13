@@ -22,6 +22,7 @@ from numba import jit, jitclass
 from numba.extending import overload
 from mpl_toolkits.mplot3d import Axes3D
 import time
+import json
 
 class prob_3D_lander(object):
     
@@ -321,7 +322,7 @@ class prob_3D_lander(object):
         grad = grad.reshape((arr_shape[0]*arr_shape[1],))
         return grad
     
-    def run_traj(self, x, plot_traj=0):
+    def run_traj(self, x, plot_traj=0, write_sum=0, write_csv=0):
         
         n = self.npts
         nf = float(n)
@@ -472,107 +473,86 @@ class prob_3D_lander(object):
             print("TOF:        %.3f sec"%(tof))
             plt.show()
 
-            # Altitude
-            
-
         # Return everything
         return OBJVAL + CONSTR_EQ + CONSTR_INEQ
 
 
 # TODO: Add omega x r terms for rotating planet
-def run_problem3(npts=40,tof=600,mass0=20000,isp=300,Tmax=66000):
+def run_problem3(config_file):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method
     """
-    config = {}
-    x_optimal_output = 'x_optimal_new.txt'
-    file_npts = 30
-    from_file = True
-    to_file = True
-
-    # Planet definition
-    R_eq = 1738e3
+    C = json.load(open(config_file))
     
-    # Config structure
-    config['npts'] = npts
-    config['mu'] = Moon.mu
-    config['mass0'] = mass0
-    config['isp'] = isp
-    config['Tmax'] = Tmax
-    config['tof'] = tof
-    config['Eta_lb'] = 0.2
-    config['Eta_ub'] = 1.0
-    config['R_eq'] = R_eq
-    config['Omega'] = 2*pi/(27.322*86400.0)
-    config['Epoch'] = 0.0
+    # Optimizer config inputs
+    opt_config = C['opt']['config']
+    opt_in = C['opt']['input']
+    opt_out = C['opt']['output']
+    CP = C['planet']
+    CV = C['vehicle']
+    CT = C['target']
     
-    # Initial state
-    ra = R_eq+100000
-    rp = R_eq+15000
-    sma = 0.5*(ra+rp)
-    ecc = (ra-rp)/(ra+rp)
-    r,v = elts_to_rv(sma,ecc,d2r(3.0),d2r(3.0),d2r(-18.0),0.0,config['mu'])
-    config['r0_I'] = r
-    config['v0_I'] = v
-    
-    # Landing site
-    config['LS_lon'] = 0.0
-    config['LS_lat'] = 0.0
-    config['LS_alt'] = 0.0
-    
-    # Target position/velocity wrt. UEN frame on surface.
-    config['rt_LS'] = [200,0,0]
-    config['vt_LS'] = [-15,0,0]
-    
-    # Problem configuration
-    udp = prob_3D_lander(config)
+    # Problem and optimization configuration
+    udp = prob_3D_lander(C)
     prob = pg.problem(udp)
-    prob.c_tol = 1e-3
-    
-    algo = pg.algorithm(pg.nlopt('slsqp'))
-    algo.set_verbosity(10)
-    algo.extract(pg.nlopt).xtol_rel = 0
-    algo.extract(pg.nlopt).ftol_rel = 0
-    algo.extract(pg.nlopt).maxeval = 500
+    prob.c_tol = opt_config['c_tol']
+    npts = opt_config['npts']
+    uda = pg.algorithm(pg.nlopt(opt_config['nlopt_alg']))
+    uda.set_verbosity(opt_config['verbosity'])
+    uda.extract(pg.nlopt).xtol_rel = opt_config['xtol_rel']
+    uda.extract(pg.nlopt).ftol_rel = opt_config['ftol_rel']
+    uda.extract(pg.nlopt).maxeval = opt_config['maxeval']
     
     # Initial guess from file.
-    if from_file:
-        print('LOADED FROM FILE')
-        content = []
-        with open(x_optimal_output) as f:
-            content = f.readlines() 
-        X0 = [float(item) for item in content]
+    if opt_in['guess_from_file']:
+        print('LOADING GUESS FROM FILE')
         
-        if not (npts == file_npts):
+        Xdata_in = json.load(open(opt_in['in_file']))
+        X0 = Xdata_in['X0']
+        
+        file_npts = Xdata_in['npts']
+        if not (file_npts == npts):
             X0new = []
             for ii in range(0,11):
                 X0new = X0new + recast_pts(X0[ii*file_npts:(ii+1)*file_npts],npts) 
             X0 = X0new + [X0[-1]]
     
     # Initial guess - linear profile
-    else:
+    elif opt_in['use_linear_guess']:
+        print('CONSTRUCTING LINEAR INITIAL GUESS')
+        opt_lg = opt_in['linear_guess']
+        tof = opt_lg['tof']
         
-        R_PF_UEN = Rot_PF_UEN(config['LS_lon'], config['LS_lat'], degrees=True)
+        # Initial state
+        ra = CP['R_eq'] + CV['orbit']['alta']
+        rp = CP['R_eq'] + CV['orbit']['altp']
+        sma = 0.5*(ra+rp)
+        ecc = (ra-rp)/(ra+rp)
+        inc = CV['orbit']['inc']
+        Om = CV['orbit']['raan']
+        om = CV['orbit']['argper']
+        nu = CV['orbit']['ta']
+        r0_I,v0_I = elts_to_rv(sma,ecc,inc,Om,om,nu,CP['mu'],CV['orbit']['degrees'])
+        
+        # Target state
+        R_PF_UEN = Rot_PF_UEN(CT['lon'], CT['lat'], degrees=True)
         R_UEN_PF = R_PF_UEN.inv()
-        R_I_PF = Rot_I_PF(config['Omega'], config['Epoch'], tof)
+        R_I_PF = Rot_I_PF(CP['Omega'], CP['Epoch'], tof)
         R_UEN_I = R_I_PF.inv() * R_UEN_PF
-        rLS_I = R_UEN_I.apply([R_eq + config['LS_alt'],0,0])
-        rt_I = rLS_I + R_UEN_I.apply(config['rt_LS'])
-        vt_I = R_UEN_I.apply(config['vt_LS']) + cross([0,0,config['Omega']],rt_I)
+        rLS_I = R_UEN_I.apply([CP['R_eq'] + CT['alt'],0,0])
+        rt_I = rLS_I + R_UEN_I.apply(CT['target_pos_UEN'])
+        vt_I = R_UEN_I.apply(CT['target_vel_UEN']) + cross([0,0,CP['Omega']],rt_I)
         
-        print('LINEAR INITIAL GUESS')
-        dt = tof/npts
-        R = linspace(config['r0_I'], rt_I, npts).transpose()
-        V = linspace(config['v0_I'], vt_I, npts).transpose()
-        Ux = [1.0] + [(V[0,k+1] - V[0,k])/dt for k in range(0,npts-1)]
-        Uy = [1.0] + [(V[1,k+1] - V[1,k])/dt for k in range(0,npts-1)]
-        Uz = [1.0] + [(V[2,k+1] - V[2,k])/dt for k in range(0,npts-1)]
+        # Construct X vector
+        R = linspace(r0_I, rt_I, npts).transpose()
+        V = linspace(v0_I, vt_I, npts).transpose()
+        Ux = [(V[0,k])/norm(V[:,k]) for k in range(0,npts)]
+        Uy = [(V[1,k])/norm(V[:,k]) for k in range(0,npts)]
+        Uz = [(V[2,k])/norm(V[:,k]) for k in range(0,npts)]
         U = array([Ux, Uy, Uz])
-        for ii in range(0,npts):
-            U[:,ii] = U[:,ii]/norm(U[:,ii])
-        m = linspace(mass0, 0.1*mass0, npts)
-        Eta = linspace(1.0,1.0, npts)
+        m = linspace(CV['mass']*opt_lg['mfrac_0'], CV['mass']*opt_lg['mfrac_f'], npts)
+        Eta = linspace(opt_lg['eta_0'],opt_lg['eta_f'], npts)
         X0 = list(R.flatten()) + list(V.flatten()) + list(U.flatten()) + list(m) + list(Eta) + [tof]
         
     # Create a population
@@ -591,14 +571,16 @@ def run_problem3(npts=40,tof=600,mass0=20000,isp=300,Tmax=66000):
         print("FEASIBLE TRAJECTORY")
         print("===================")
         
-    if to_file:
+    # Produce summary
+    udp.run_traj(pop.champion_x, plot_traj=opt_out['plot_traj'], write_sum=opt_out['write_sum'], write_csv=opt_out['write_csv'] )
+        
+    if opt_out['write_X']:
         print('WRITING TO FILE')
-        fout = open(x_optimal_output,'w+')
-        champion_vec = pop.champion_x
-        for item in champion_vec:
-            fout.write("%30.15f\n"%(item))
-        fout.close()
+        outdict = { 'npts':npts, 'X0':pop.champion_x }
+        if (not opt_out['only_write_feasible']) or (opt_out['only_write_feasible'] and is_feas):
+            json.dump(outdict, open(opt_out['file_X_out'],'w+'), indent=4)
+        
 
-    udp.summary(pop.champion_x)
+    
 
 

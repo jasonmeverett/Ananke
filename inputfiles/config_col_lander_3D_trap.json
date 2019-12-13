@@ -1,0 +1,89 @@
+{
+    "planet":
+    {
+        "mu": 4902799000000.0,
+        "R_eq": 1738000.0,
+        "Omega": 0.0000026616665,
+        "Epoch": 0.0
+    },
+    "vehicle":
+    {
+        "Tmax": 66000.0,
+        "isp": 450.0,
+        "mass": 20000.0,
+        "eta_lb": 0.2,
+        "eta_ub": 0.8,
+        "orbit":
+        {
+            "alta": 100000.0,
+            "altp": 15000.0,
+            "inc": 3.0,
+            "raan": 3.0,
+            "argper": -18.0,
+            "ta": 0.0,
+            "degrees":true
+        }
+    },
+    "target":
+    {
+        "lon": 0.0,
+        "lat": 0.0,
+        "alt": 0.0,
+        "target_pos_UEN":
+        [
+            200.0,
+            0.0,
+            0.0
+        ],
+        "target_vel_UEN":
+        [
+            -15.0,
+            0.0,
+            0.0
+        ]
+    },
+    "opt":
+    {
+        "config":
+        {
+            "npts": 30,
+            "nlopt_alg": "slsqp",
+            "verbosity": 1,
+            "c_tol": 0.001,
+            "xtol_rel": 0.0,
+            "ftol_rel": 0.0,
+            "maxeval": 5000,
+            "use_mbh_wrapper": true,
+            "mbh":
+            {
+                "stop": 3,
+                "perturb": 0.1
+            }
+        },
+        "input":
+        {
+            "guess_from_file": false,
+            "in_file": "x_final.json",
+            "use_linear_guess": true,
+            "linear_guess":
+            {
+                "tof": 600.0,
+                "mfrac_0": 1.0,
+                "mfrac_f": 0.4,
+                "eta_0": 1.0,
+                "eta_f": 0.4
+            }
+        },
+        "output":
+        {
+            "plot_traj": true,
+            "write_X": true,
+            "only_write_feasible": true,
+            "write_summary": true,
+            "write_csv": true,
+            "file_X_out": "x_final.json",
+            "file_sum_out": "summary.json",
+            "file_csv_out": "output.csv"
+        }
+    }
+}

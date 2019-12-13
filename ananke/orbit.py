@@ -13,8 +13,13 @@ from scipy.linalg import norm
 from scipy.spatial.transform import Rotation as R
 
 # https://downloads.rene-schwarz.com/download/M001-Keplerian_Orbit_Elements_to_Cartesian_State_Vectors.pdf
-def elts_to_rv(a,e,i,Om,om,nu,mu):
+def elts_to_rv(a,e,i,Om,om,nu,mu,degrees=False):
     
+    if degrees:
+        i  = i  * pi/180
+        Om = om * pi/180
+        om = om * pi/180
+        nu = nu * pi/180
     
     # Get the distance from the central body
     E = 2*arctan(sqrt((1-e)/(1+e)) * tan(nu/2) )
