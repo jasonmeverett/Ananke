@@ -27,29 +27,42 @@ import json
 class prob_3D_lander(object):
     
     # Function initialization
-    def __init__(self,config):
-        self.npts = config['npts']
-        self.tof = config['tof']
-        self.r0_I = config['r0_I']
-        self.v0_I = config['v0_I']
+    def __init__(self,C):
+        CP = C['planet']
+        CV = C['vehicle']
+        CT = C['target']
+        CO = C['opt']
+        self.npts = CO['config']['npts']
         self.g0 = 9.81
-        self.isp = config['isp']
-        self.Tmax = config['Tmax']
-        self.mass0 = config['mass0']
-        self.Eta_lb = config['Eta_lb']
-        self.Eta_ub = config['Eta_ub']
-        self.mu = config['mu']
-        self.R_eq = config['R_eq']
-        self.Om = config['Omega']
-        self.ep0 = config['Epoch']
-        self.LS_lat = config['LS_lat']
-        self.LS_lon = config['LS_lon']
-        self.LS_alt = config['LS_alt']
-        self.rt_LS = config['rt_LS']
-        self.vt_LS = config['vt_LS']
-        
-        self.R_PF_UEN = Rot_PF_UEN(self.LS_lon, self.LS_lat, degrees=True)
+        self.isp = CV['isp']
+        self.Tmax = CV['Tmax']
+        self.mass0 = CV['mass']
+        self.Eta_lb = CV['eta_lb']
+        self.Eta_ub = CV['eta_ub']
+        self.mu = CP['mu']
+        self.R_eq = CP['R_eq']
+        self.Om = CP['Omega']
+        self.ep0 = CP['Epoch']
+        self.LS_lat = CT['lat']
+        self.LS_lon = CT['lon']
+        self.LS_alt = CT['alt']
+        self.rt_LS = CT['target_pos_UEN']
+        self.vt_LS = CT['target_vel_UEN']
+        self.R_PF_UEN = Rot_PF_UEN(self.LS_lon, self.LS_lat, CT['degrees'])
         self.R_UEN_PF = self.R_PF_UEN.inv()
+        
+        # Initial state
+        ra = CP['R_eq'] + CV['orbit']['alta']
+        rp = CP['R_eq'] + CV['orbit']['altp']
+        sma = 0.5*(ra+rp)
+        ecc = (ra-rp)/(ra+rp)
+        inc = CV['orbit']['inc']
+        Om = CV['orbit']['raan']
+        om = CV['orbit']['argper']
+        nu = CV['orbit']['ta']
+        r0_I,v0_I = elts_to_rv(sma,ecc,inc,Om,om,nu,CP['mu'],CV['orbit']['degrees'])
+        self.r0_I = r0_I
+        self.v0_I = v0_I
 
         return
     
@@ -70,9 +83,9 @@ class prob_3D_lander(object):
         v_ub = [ sf_v*norm(self.v0_I)]*3*self.npts
         u_lb = [-5]*3*self.npts
         u_ub = [ 5]*3*self.npts
-        m_lb = [0.1*self.mass0]*self.npts
+        m_lb = [-0.1*self.mass0]*self.npts
         m_ub = [1.1*self.mass0]*self.npts
-        Eta_lb = [0.0]*self.npts
+        Eta_lb = [-0.1]*self.npts
         Eta_ub = [1.1]*self.npts
         T_lb = [300]
         T_ub = [800]
@@ -394,6 +407,11 @@ class prob_3D_lander(object):
         # Other objective - minimize control effort
         OBJVAL = [ sum([ 0.5*dt*( (Tm*Eta[k]/m[k])**2.0 + (Tm*Eta[k+1]/m[k+1])**2.0 ) for k in range(0,n-1) ]) ]
 
+        # Landing site position
+        X = Rx - rt_I[0]
+        Y = Ry - rt_I[1]
+        Z = Rz - rt_I[2]
+
         # Plot, if enabled
         if plot_traj == 1:
             t_arr = linspace(0,tof,n)
@@ -545,14 +563,15 @@ def run_problem3(config_file):
         vt_I = R_UEN_I.apply(CT['target_vel_UEN']) + cross([0,0,CP['Omega']],rt_I)
         
         # Construct X vector
+        dt = tof/npts
         R = linspace(r0_I, rt_I, npts).transpose()
         V = linspace(v0_I, vt_I, npts).transpose()
-        Ux = [(V[0,k])/norm(V[:,k]) for k in range(0,npts)]
-        Uy = [(V[1,k])/norm(V[:,k]) for k in range(0,npts)]
-        Uz = [(V[2,k])/norm(V[:,k]) for k in range(0,npts)]
+        Ux = [1.0] + [(V[0,k+1] - V[0,k])/dt/norm(V[:,k]) for k in range(0,npts-1)]
+        Uy = [1.0] + [(V[1,k+1] - V[1,k])/dt/norm(V[:,k]) for k in range(0,npts-1)]
+        Uz = [1.0] + [(V[2,k+1] - V[2,k])/dt/norm(V[:,k]) for k in range(0,npts-1)]
         U = array([Ux, Uy, Uz])
         m = linspace(CV['mass']*opt_lg['mfrac_0'], CV['mass']*opt_lg['mfrac_f'], npts)
-        Eta = linspace(opt_lg['eta_0'],opt_lg['eta_f'], npts)
+        Eta =  [1.0] + [(m[k]-m[k+1])/dt*9.81*CV['isp']/CV['Tmax']  for k in range(0,npts-1)] # linspace(opt_lg['eta_0'],opt_lg['eta_f'], npts)
         X0 = list(R.flatten()) + list(V.flatten()) + list(U.flatten()) + list(m) + list(Eta) + [tof]
         
     # Create a population
@@ -560,23 +579,28 @@ def run_problem3(config_file):
     pop = pg.population(prob)
     pop.push_back(X0)
 
+    # Monotonic basin hopping option
+    if opt_config['use_mbh_wrapper']:
+        mbhuda = pg.mbh(uda, stop=opt_config['mbh']['stop'], perturb=opt_config['mbh']['perturb'])
+        algo = pg.algorithm(mbhuda)
+    else:
+        algo = uda
+    
     # Evolve
-    print("Evolving...")
-    pop = algo.evolve(pop)
+    if C['opt']['evolve']:
+        print("Evolving...")
+        pop = algo.evolve(pop)
 
     # Check feasibility
     is_feas = prob.feasibility_x(pop.champion_x)
-    if is_feas:
-        print("===================")
-        print("FEASIBLE TRAJECTORY")
-        print("===================")
+    print("Feasible trajectory? ", is_feas)
         
     # Produce summary
     udp.run_traj(pop.champion_x, plot_traj=opt_out['plot_traj'], write_sum=opt_out['write_sum'], write_csv=opt_out['write_csv'] )
         
     if opt_out['write_X']:
         print('WRITING TO FILE')
-        outdict = { 'npts':npts, 'X0':pop.champion_x }
+        outdict = { 'npts':npts, 'X0':list(pop.champion_x) }
         if (not opt_out['only_write_feasible']) or (opt_out['only_write_feasible'] and is_feas):
             json.dump(outdict, open(opt_out['file_X_out'],'w+'), indent=4)
         

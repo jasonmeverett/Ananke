@@ -17,7 +17,7 @@ def elts_to_rv(a,e,i,Om,om,nu,mu,degrees=False):
     
     if degrees:
         i  = i  * pi/180
-        Om = om * pi/180
+        Om = Om * pi/180
         om = om * pi/180
         nu = nu * pi/180
     
