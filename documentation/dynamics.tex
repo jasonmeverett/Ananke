@@ -1,0 +1,132 @@
+\subsection{Frame Definitions}
+There are three reference frames of importance that will be discussed in this section. The first is the inertial reference frame $I$ that is assumed to be inertially fixed in space. The planet-fixed frame, $PF$, is related to the inertial frame $I$ by a constant-angular-velocity rotation along the $\hat{I}_z$ vector. The DCM that represents the rotation from the inertial reference frame to the planet fixed frame is:
+\begin{equation}
+C_{I}^{PF} = \begin{bmatrix}
+\cos{\theta} && \sin{\theta} && 0 \\
+-\sin{\theta} && \cos{\theta} && 0 \\
+0 && 0 && 1
+\end{bmatrix}
+\end{equation}
+\begin{equation}
+\theta = \Omega(t - t_0)
+\end{equation}
+Where $\Omega$ represents the planetary rotation rate, $t$ is the current time referenced from some epoch $t_0$, and $t_0$ is a reference epoch that represents when this rotation matrix was the identity matrix. In this document, the angular rotation vector is expressed as:
+\begin{equation}
+\vec{\Omega} = \vec{\Omega}_{PF/I}^{I} = \begin{bmatrix}
+0 \\ 0 \\ \Omega
+\end{bmatrix}
+\end{equation}
+\paragraph{}
+Another important frame of reference is the Up-East-North frame, or the $\mathit{UEN}$ frame, which is a frame that is rotationally locked with the planet-fixed frame and represents the orientation of the landing site. Referenced from the planet-fixed frame, this frame is a rotation along the planet-fixed Z axis of longitude $\phi$, followed by a negative rotation along the new frame's Y axis of latitude $\lambda$:
+\begin{equation}
+C_{PF}^{UEN} = \begin{bmatrix}
+\cos{\phi} && \sin{\phi} && 0 \\
+-\sin{\phi} && \cos{\phi} && 0 \\
+0 && 0 && 1
+\end{bmatrix}
+\begin{bmatrix}
+\cos{\lambda} && 0 && \sin{\lambda} \\
+0 && 1 && 0 \\
+-\sin{\lambda} && 0 && \cos{\lambda}
+\end{bmatrix}
+\end{equation}
+\paragraph{}
+For normalization purposes, it may be convenient to translate the $\mathit{UEN}$ frame by the distance of the planetary radius $R_{eq}$ (and optionally by a specified altitude $h$) along its X axis, to arrive at a frame that is fixed at or near the surface of the planetary body. In this new frame (designated the Landing Site frame, or $\mathit{LS}$ frame), it is intuitive to construct targeted position and velocity vectors that allow the optimizer to target a position directly above (or anywhere around) a fixed point on the surface.
+
+\subsection{Equations of Motion}
+\paragraph{}
+This section describes the system dynamics of the problem.
+\paragraph{}
+A vehicle's current state can be expressed in cartesian, inertial coordinates in the following fashion:
+\begin{multicols}{2}
+\begin{equation}
+\vec{r}_{v/c}^I = \begin{bmatrix}
+r_x \\ r_y \\ r_z
+\end{bmatrix}
+\end{equation}
+\break
+\begin{equation}
+\vec{v}_{v/c}^I = \begin{bmatrix}
+v_x \\ v_y \\ v_z
+\end{bmatrix}
+\end{equation}
+\end{multicols}
+Where $\vec{r}_{v/c}^I$ represents the position vector $\vec{r}$ of the vehicle $v$ with respect to the planetary center $c$, expressed in the inertial frame $I$. When the superscript on a vector is omitted, it is implied that the vector is represented in the inertial frame. If the point of reference of a vector is omitted, it is implied that the point of reference of the vector is the planetary center $c$.
+\paragraph{}
+The vehicle's state changes are governed by the following system of equations:
+\begin{equation}
+\dv{}{t}[\vec{r}_{v/c}^I]=\dot{\vec{r}}_{v/c}^I=
+\vec{v}_{v/c}^I
+\end{equation}
+\begin{equation}
+\dv{}{t}[\vec{v}_{v/c}^I]=\dot{\vec{v}}_{v/c}^I=
+-\frac{\mu}{r^3}\vec{r} + \frac{T_m \eta}{m}\vec{1}_T
+\end{equation}
+Where $T_m$ is the maximum potential thrust of the vehicle, $\eta$ is the current commanded throttle, $m$ is the current vehicle mass, $\vec{1}_T$ is the unit thrust vector direction (also referred by in this document as $\hat{u}$), and $\mu$ is the gravitational parameter of the central body.
+\paragraph{}
+It is important to note here that the system of equations is impartial to the phase of the trajectory. During powered flight portions of the trajectory, in phase $i$, $\eta$ is optimized such that the following constraint is enforced:
+\begin{equation}
+\eta_{{lb}_i} \leq \eta(t)_i \leq \eta_{{ub}_i}
+\end{equation}
+where $\eta_{{lb}_i}$ and $\eta_{{ub}_i}$ are constant for a specific phase. It will be shown later that all partials pertaining to $\hat{u}$ when $\eta = 0$ will also be $0$.
+
+\subsection{Objective Functions}
+\paragraph{}
+Two common objective functions will be discussed throughout this document. The first one represents the minimum control problem, where the objective function
+\begin{equation}
+J_{mc} = \int_{0}^{T} \left[\frac{T_m \eta(\tau)}{m(\tau)}\right]^2 d\tau
+\end{equation}
+seeks to minimize the square of acceleration over a period of time $T$. Note that the time of flight $T$ is different from the maximum thrust $T_m$. This objective function can be expanded to the multi-phase problem objective function as follows:
+\begin{equation}
+J_{mc_{tot}} = \sum_{i=1}^{P} \kappa_i \int_{0}^{T_i} \left[\frac{T_{m_i} \eta(\tau)_i}{m(\tau)_i}\right]^2 d\tau
+\end{equation}
+where $P$ is the total number of flight phases of time $T_i$ each, and $\kappa_i$ is a weighting parameter for phase $i$. Note also that each phase $i$ starts at relative time $t_i = 0$ and ends at time $t_i = T$.
+\paragraph{}
+The second objective function represents the minimum fuel problem, expressed as:
+\begin{equation}
+J_{mf} = \int_{0}^{T} \eta(\tau) d\tau
+\end{equation}
+Expanded to multi-phase form:
+\begin{equation}
+J_{mf_{tot}} = \sum_{i=1}^{P} \kappa_i \int_{0}^{T_i} \eta(\tau)_i d\tau
+\end{equation}
+\paragraph{}
+The terms $\kappa_i$ allow for a heavier weighting on propellant usage of a specific stage. In the special case of a two-phase descent where the main objective is only final mass to surface of the descent stage, with a constraint on the maximum allowable propellant usage of the previous stage $mp_{max}$, the cost function would simply become:
+\begin{equation}
+J_{mf_{tot}} = \int_{0}^{T_P} \eta(\tau)_P d\tau
+\end{equation}
+subject to the constraint:
+\begin{equation}
+\int_{0}^{T_{P-1}} \frac{T_{m_{P-1}} \eta(\tau)_{P-1}}{g_0 I_{sp_{P-1}}} \leq mp_{max}
+\end{equation}
+\paragraph{}
+The total fuel propellant usage allowed in stage $P-1$ can be a function of other state parameters, in turn effecting how much allowable fuel can be expended before phase switching must occur. I.e.,
+\begin{equation}
+mp_{max} = f(\vec{r}(t), \vec{v}(t), t, ... )
+\end{equation}
+This modification to the problem will effect the derivation of the nonlinear partials for the constraint, and is not discussed in this document, but can easily be derived.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
