@@ -1,17 +1,69 @@
-\subsection{Collocation Transcription}
-The decision vector.
+\subsection{Collocation Overview}
+The decision vector for this type of multi-phase collocation is large, but not untraceable. For sake of clarity, a P-phase collocation method example will be shown with n collocation points in each phase (note: the amount of collocation points can vary per phase). It is also important to note that this matrix can be rearranged in any fashion, as some forms may bode well for NLP solving schemes that require specific gradient formats.
+\begin{multicols}{2}
+\begin{equation}
+\vec{X}_{dv} = 
+\begin{bmatrix}
+\vec{R}_{[x ... z]_{[0 ... P]}} \\
+\vec{V}_{[x ... z]_{[0 ... P]}} \\
+\vec{U}_{[x ... z]_{[0 ... P]}} \\
+\vec{m}_{[0 ... P]} \\
+\vec{\eta }_{[0 ... P]} \\
+\nu_0 \\
+T_{[0 ... P]} \\
+\end{bmatrix}
+\rightarrow
+\begin{bmatrix}
+3 n_0 + ... + 3 n_p \\
+3 n_0 + ... + 3 n_p \\
+3 n_0 + ... + 3 n_p \\
+n_0 + ... + n_p \\
+n_0 + ... + n_p \\
+1 \\
+P 
+\end{bmatrix}
+\end{equation} 
+\break
+\begin{equation}
+\vec{F} = 
+\begin{bmatrix}
+J \\
+\vec{R}_0 \\
+\vec{V}_0 \\
+m_0 \\
+\vec{R}_f \\
+\vec{V}_f \\
+\vec{R}_{c_{[0 ... P]}} \\
+\vec{V}_{c_{[0 ... P]}} \\
+\vec{m}_{c_{[0 ... P]}} \\
+\vec{u}_{mag_{[0 ... P]}} \\
+\vec{\eta}_{lb_{[0 ... P]}} \\
+\vec{\eta}_{ub_{[0 ... P]}} \\
+\vec{R}_{m_{[0 \rightarrow P]}} \\
+\vec{V}_{m_{[0 \rightarrow P]}} \\
+m_{m_{[0 \rightarrow P]}} \\
+T_{c_{[0 ... P]}} \\
+\end{bmatrix}
+\end{equation} 
+\end{multicols}
+Assume an example of a 3-phase trajectory with each phase containing a total of 15 collocation points. This would lead to a decision vector with a length of 454 and a fitness/constraint vector of length  252+14+42+45+90+12+5
+
+
 \subsection{Path Constraints}
 Under trapezoidal collocation transcription, the path constraints of $N$ collocation points will take on the following form within any arbitrary phase of the trajectory:
 \begin{align}
-\vec{r}_{k+1} - \vec{r}_k = \frac{1}{2}\Delta t ( \vec{v}_{k+1} + \vec{v}_k ) &&
+\vec{r}_{k+1} - \vec{r}_k = 
+\frac{1}{2}\Delta t ( \vec{v}_{k+1} + \vec{v}_k ) &&
 k \in \{ 0, ... , N-1 \}
 \end{align}
 \begin{align}
-\vec{v}_{k+1} - \vec{v}_k = \frac{1}{2}\Delta t \left[ \frac{\mu }{r_{k+1}^3}\vec{r}_{k+1} + \frac{\mu }{r_{k}^3}\vec{r}_{k} +  \frac{T_m \eta_k}{m_k} \hat{u}_{k} + \frac{T_m \eta_{k+1}}{m_{k+1}} \hat{u}_{k+1} \right] &&
+\vec{v}_{k+1} - \vec{v}_k = 
+\frac{1}{2}\Delta t \left[ \frac{\mu }{r_{k+1}^3}\vec{r}_{k+1} + \frac{\mu }{r_{k}^3}\vec{r}_{k} +  \frac{T_m \eta_k}{m_k} \hat{u}_{k} + \frac{T_m \eta_{k+1}}{m_{k+1}} \hat{u}_{k+1} \right] &&
 k \in \{ 0, ... , N-1 \}
 \end{align}
 \begin{align}
-m_{k} - m_{k+1} = \frac{1}{2}\Delta t \frac{T_m}{g_0 I_{sp}} ( \eta_{k+1} + \eta_{k} ) &&
+m_{k} - m_{k+1} = 
+\frac{1}{2}\Delta t \frac{T_m}{g_0 I_{sp}} ( \eta_{k+1} + \eta_{k} ) &&
 k \in \{ 0, ... , N-1 \}
 \end{align}
 \subsection{Boundary Constraints}
