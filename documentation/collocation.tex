@@ -36,17 +36,44 @@ m_0 \\
 \vec{R}_{c_{[0 ... P]}} \\
 \vec{V}_{c_{[0 ... P]}} \\
 \vec{m}_{c_{[0 ... P]}} \\
-\vec{u}_{mag_{[0 ... P]}} \\
+\vec{U}_{mag_{[0 ... P]}} \\
+\vec{R}_{mag_{[0 ... P]}} \\
 \vec{\eta}_{lb_{[0 ... P]}} \\
 \vec{\eta}_{ub_{[0 ... P]}} \\
+\nu_{lb_{0}} \\
+\nu_{ub_{0}} \\
 \vec{R}_{m_{[0 \rightarrow P]}} \\
 \vec{V}_{m_{[0 \rightarrow P]}} \\
 m_{m_{[0 \rightarrow P]}} \\
-T_{c_{[0 ... P]}} \\
+T_{lb_{[0 ... P]}} \\
+T_{ub_{[0 ... P]}} \\
+\end{bmatrix}
+\rightarrow
+\begin{bmatrix}
+1 \\
+3 \\
+3 \\
+1 \\
+3 \\
+3 \\
+3(n_0-1) + ... + 3(n_P - 1) \\
+3(n_0-1) + ... + 3(n_P - 1) \\
+(n_0-1) + ... + (n_P - 1) \\
+n_0 + ... + n_p \\
+n_0 + ... + n_p \\
+n_0 + ... + n_p \\
+n_0 + ... + n_p \\
+1 \\
+1 \\
+3 (P - 1) \\
+3 (P - 1) \\
+P - 1 \\
+1 \\
+1 \\
 \end{bmatrix}
 \end{equation} 
 \end{multicols}
-Assume an example of a 3-phase trajectory with each phase containing a total of 15 collocation points. This would lead to a decision vector with a length of 454 and a fitness/constraint vector of length  252+14+42+45+90+12+5
+Assume an example of a 3-phase trajectory with each phase containing a total of 15 collocation points. This would lead to a decision vector with a length of 499 and a fitness/constraint vector of length  506. The constraint vector components will be described throughout the subsequent sections. The true form of the constraints may vary at mechanization depending on the NLP solver selected.
 
 
 \subsection{Path Constraints}
@@ -148,10 +175,10 @@ Then, solve for the vector. Okay, now we're done with those!
 \subsubsection{Phase Boundary Constraints}
 At the boundaries of each phase, a constraint is set on the state of the vehicle. In other words, for phase $i$ with $n$ segments and phase $i+1$ as the subsequent phase, the following constraints must be met:
 \begin{equation}
-\vec{r}_{n_{i}} = \vec{r}_{0_{i+1}}
+\vec{R}_{n_{i}} = \vec{R}_{0_{i+1}}
 \end{equation}
 \begin{equation}
-\vec{v}_{n_{i}} = \vec{v}_{0_{i+1}}
+\vec{V}_{n_{i}} = \vec{V}_{0_{i+1}}
 \end{equation}
 For mass continuity, there are two forms of mass constraints that can be employed. The first is representative of a fixed mass drop between phases:
 \begin{equation}
@@ -164,5 +191,183 @@ mp_{n_{i}} \geq 0
 \begin{equation}
 mp_{0_{i}} = mp_{\mathit{init}_{i+1}}
 \end{equation}
+\subsubsection{Other Constraints}
+Altitude constraint:
+\begin{equation}
+R_x^2 + R_y^2 + R_z^2 - R_{min}^2 >= 0
+\end{equation}
+Throttling constraints:
+\begin{equation}
+\eta_{lb} <= \eta_{k}
+\end{equation}
+\subsection{Partials}
+The following is a list of partials that must be calculated for a P-phase system with a total decision vector of $\vec{X}$ and a fitness vector of $\vec{F}$.
 
+\begin{equation}
+\pdv{\vec{X}}{\vec{F}} = 
+\begin{bmatrix}
+
+[0] &
+[0] &
+\pdv{J}{\vec{U}_{[x,y,z]_{[0,1,2]}}} &
+\pdv{J}{\vec{m}_{[0,1,2]}} &
+\pdv{J}{\vec{\eta}_{[0,1,2]}} &
+\pdv{J}{T_{[0,1,2]}} &
+[0]  \\
+
+\pdv{\vec{R}_0}{\vec{R}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{\vec{R}_0}{\nu_0}  \\
+
+[0] &
+\pdv{\vec{V}_0}{\vec{V}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{\vec{V}_0}{\nu_0}  \\
+
+[0] &
+[0] &
+[0] &
+\pdv{m_0}{\vec{m}_{[0,1,2]}} &
+[0] &
+[0] &
+[0]  \\
+
+\pdv{\vec{R}_f}{\vec{R}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{\vec{R}_f}{T_{[0,1,2]}} &
+[0]  \\
+
+[0] &
+\pdv{\vec{V}_f}{\vec{V}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+\pdv{\vec{V}_f}{T_{[0,1,2]}} &
+[0]  \\
+
+\pdv{\vec{R}_{c_{[0,1,2]}}}{\vec{R}_{[x,y,z]_{[0,1,2]}}} &
+\pdv{\vec{R}_{c_{[0,1,2]}}}{\vec{V}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+\pdv{\vec{R}_{c_{[0,1,2]}}}{T_{[0,1,2]}} &
+[0]  \\
+
+\pdv{\vec{V}_{c_{[0,1,2]}}}{\vec{R}_{[x,y,z]_{[0,1,2]}}} &
+\pdv{\vec{V}_{c_{[0,1,2]}}}{\vec{V}_{[x,y,z]_{[0,1,2]}}} &
+\pdv{\vec{V}_{c_{[0,1,2]}}{\vec{U}_{[x,y,z]_{[0,1,2]}}}} &
+\pdv{\vec{V}_{c_{[0,1,2]}}}{\vec{m}_{[0,1,2]}} &
+\pdv{\vec{V}_{c_{[0,1,2]}}}{\vec{\eta}_{[0,1,2]}} &
+\pdv{\vec{V}_{c_{[0,1,2]}}}{T_{[0,1,2]}} &
+[0]  \\
+
+[0] &
+[0] &
+[0] &
+\pdv{\vec{m}_{c_{[0,1,2]}}}{\vec{m}_{[0,1,2]}} &
+\pdv{\vec{m}_{c_{[0,1,2]}}}{\vec{\eta}_{[0,1,2]}} &
+\pdv{\vec{m}_{c_{[0,1,2]}}}{T_{[0,1,2]}} &
+[0]  \\
+
+[0] &
+[0] &
+\pdv{\vec{U}_{mag_{[0,1,2]}}}{\vec{U}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+[0]  \\
+
+\pdv{\vec{R}_{mag_{[0,1,2]}}}{\vec{R}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+[0]  \\
+
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{\vec{\eta}_{lb_{[0,1,2]}}}{\vec{\eta}_{[0,1,2]}} &
+[0] &
+[0]  \\
+
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{\vec{\eta}_{ub_{[0,1,2]}}}{\vec{\eta}_{[0,1,2]}} &
+[0] &
+[0]  \\
+
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{\nu_{lb_0}}{\nu_0} \\
+
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{\nu_{ub_0}}{\nu_0} \\
+
+\pdv{\vec{R}_{[0 \rightarrow 1, 1 \rightarrow 2]}}{\vec{R}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+[0]  \\
+
+[0] &
+\pdv{\vec{V}_{[0 \rightarrow 1, 1 \rightarrow 2]}}{\vec{V}_{[x,y,z]_{[0,1,2]}}} &
+[0] &
+[0] &
+[0] &
+[0] &
+[0]  \\
+
+[0] &
+[0] &
+[0] &
+\pdv{m_{[0 \rightarrow 1, 1 \rightarrow 2]}}{\vec{m}_{[0,1,2]}} &
+[0] &
+[0] &
+[0]  \\
+
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{T_{lb_{[0,1,2]}}}{T_{[0,1,2]}} &
+[0]  \\
+
+[0] &
+[0] &
+[0] &
+[0] &
+[0] &
+\pdv{T_{ub_{[0,1,2]}}}{T_{[0,1,2]}} &
+[0]  \\
+\end{bmatrix}
+\end{equation}
+
+It is important to note that the partial matrix above is for the minimum-control problem. For the minimum-fuel problem, $\pdv{J}{\vec{U}_{[x,y,z]_{[0,1,2]}}}$ and $\pdv{J}{\vec{m}_{[0,1,2]}}$ null to zero matrices if the objective function is used that is specified above.
 

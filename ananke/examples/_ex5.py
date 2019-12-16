@@ -3,7 +3,7 @@
 """
 Created on Sun Dec  1 09:48:16 2019
 
-3-Dimensional full gravity optimization problem.
+MULTI-PHASE 3-Dimensional full gravity optimization problem.
 This should match optimality!!!!
 
 @author: jasonmeverett

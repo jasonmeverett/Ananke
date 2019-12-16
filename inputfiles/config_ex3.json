@@ -12,15 +12,13 @@
         "Tmax": 66000.0,
         "isp": 450.0,
         "mass": 20000.0,
-        "eta_lb": 0.2,
-        "eta_ub": 0.8,
         "orbit":
         {
             "alta": 100000.0,
             "altp": 15000.0,
-            "inc": 3.0,
-            "raan": 3.0,
-            "argper": -20.0,
+            "inc": 0.0,
+            "raan": 0.0,
+            "argper": -15.0,
             "ta": 0.0,
             "degrees":true
         }
@@ -46,21 +44,22 @@
     },
     "opt":
     {
-        "evolve": false,
+        "evolve": true,
+        "objtype": "control",
         "config":
         {
             "npts": 20,
             "nlopt_alg": "slsqp",
             "verbosity": 20,
-            "c_tol": 0.001,
+            "c_tol": 0.01,
             "xtol_rel": 0.0,
             "ftol_rel": 0.0,
-            "maxeval": 5000,
+            "maxeval": 10000,
             "use_mbh_wrapper": false,
             "mbh":
             {
-                "stop": 3,
-                "perturb": 0.01
+                "stop": 2,
+                "perturb": 0.05
             }
         },
         "input":
@@ -70,11 +69,27 @@
             "use_linear_guess": true,
             "linear_guess":
             {
-                "tof": 600.0,
+                "tof": 780.0,
+                "nu0": -5.0,
                 "mfrac_0": 1.0,
                 "mfrac_f": 0.6,
                 "eta_0": 1.0,
                 "eta_f": 0.6
+            }
+        },
+        "bounds":
+        {
+            "lo":
+            {
+                "T": 300.0,
+                "eta": 0.2,
+                "nu0": -5.0
+            },
+            "hi":
+            {
+                "T": 900.0,
+                "eta": 0.8,
+                "nu0": -5.0
             }
         },
         "output":

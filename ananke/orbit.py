@@ -12,6 +12,20 @@ from ananke.util import unit
 from scipy.linalg import norm
 from scipy.spatial.transform import Rotation as R
 
+def calc_o_odot(a,e,nu,mu,degrees=False):
+    if degrees:
+        nu = nu*pi/180
+        
+    # Get the distance from the central body
+    E = 2*arctan(sqrt((1-e)/(1+e)) * tan(nu/2) )
+    r = a*(1-e*cos(E))
+    
+    # Obtain the position and velocity vector in the perifocal frame
+    o = r*array([cos(nu),sin(nu),0])
+    odot = sqrt(mu*a)/r*array([-sin(E), sqrt(1-e**2.0)*cos(E), 0])
+    
+    return (o, odot)
+
 # https://downloads.rene-schwarz.com/download/M001-Keplerian_Orbit_Elements_to_Cartesian_State_Vectors.pdf
 def elts_to_rv(a,e,i,Om,om,nu,mu,degrees=False):
     
@@ -20,14 +34,8 @@ def elts_to_rv(a,e,i,Om,om,nu,mu,degrees=False):
         Om = Om * pi/180
         om = om * pi/180
         nu = nu * pi/180
-    
-    # Get the distance from the central body
-    E = 2*arctan(sqrt((1-e)/(1+e)) * tan(nu/2) )
-    r = a*(1-e*cos(E))
-    
-    # Obtain the position and velocity vector in the perifocal frame
-    o = r*array([cos(nu),sin(nu),0])
-    odot = sqrt(mu*a)/r*array([-sin(E), sqrt(1-e**2.0)*cos(E), 0])
+        
+    o, odot = calc_o_odot(a, e, nu, mu, degrees=False)
     
     # Constrict transformation matrices
     # NOTE: No inverse required here because construction occurs from dcm 

@@ -10,6 +10,34 @@ from scipy.spatial.transform import Rotation as R
 from numpy import *
 from ananke.planets import *
 
+def Rot_I_Perifocal(Om, i, om, degrees=True):
+    
+    if degrees:
+        Om = Om * pi/180
+        i  = i  * pi/180
+        om = om * pi/180
+        
+    R1 = R.from_dcm([
+        [cos(-om),sin(-om),0],
+        [-sin(-om),cos(-om),0],
+        [0,0,1]
+        ]).inv()
+    
+    R2 = R.from_dcm([
+        [1,0,0],
+        [0,cos(-i),sin(-i)],
+        [0,-sin(-i),cos(-i)]
+        ]).inv()
+    
+    R3 = R.from_dcm([
+        [cos(-Om),sin(-Om),0],
+        [-sin(-Om),cos(-Om),0],
+        [0,0,1]
+        ]).inv()
+    
+    return R3 * R2 * R1
+    
+
 # Get the inertial position of a landing site.
 def Pos_LS(lon,lat,alt,R_eq=1738e3,degrees=False):
     """
