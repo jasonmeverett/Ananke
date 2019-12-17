@@ -24,20 +24,23 @@ from mpl_toolkits.mplot3d import Axes3D
 import time
 import json
 
-class prob_3D_lander(object):
+class prob_3D_lander_multiphase(object):
     
     # Function initialization
     def __init__(self,C):
+        self.C = C
         CP = C['planet']
         CV = C['vehicle']
         CT = C['target']
         CO = C['opt']
         self.objtype = CO['objtype']
+        self.nphases = len(CV['phases'])
+        self.phases = CV['phases']
         self.npts = CO['config']['npts']
         self.g0 = 9.81
-        self.isp = CV['isp']
-        self.Tmax = CV['Tmax']
-        self.mass0 = CV['mass']
+        self.isps = [CV['engines'][ii]['isp'] for ii in range(0, len(CV['engines']))]
+        self.Tmaxs = [CV['engines'][ii]['Tmax'] for ii in range(0, len(CV['engines']))]
+        self.mass0 = sum([CV['stages'][ii]['ms'] + CV['stages'][ii]['mp'] for ii in CV['phases'][0][0]])
         self.mu = CP['mu']
         self.R_eq = CP['R_eq']
         self.plOm = CP['Omega']
@@ -51,9 +54,12 @@ class prob_3D_lander(object):
         self.R_UEN_PF = self.R_PF_UEN.inv()
 
         # Bounds
-        self.bnds_Eta = [CO['bounds']['lo']['eta'], CO['bounds']['hi']['eta']]
-        self.bnds_nu = [CO['bounds']['lo']['nu0'], CO['bounds']['hi']['nu0']]
-        self.bnds_T = [CO['bounds']['lo']['T'], CO['bounds']['hi']['T']]
+        self.Eta_lbs = CO['bounds']['lo']['eta']
+        self.Eta_ubs = CO['bounds']['hi']['eta']
+        self.nu_lb = CO['bounds']['lo']['nu0']
+        self.nu_ub = CO['bounds']['hi']['nu0']
+        self.T_lbs = CO['bounds']['lo']['T']
+        self.T_ubs = CO['bounds']['hi']['T']
         
         # Initial state
         ra = CP['R_eq'] + CV['orbit']['alta']
@@ -65,47 +71,50 @@ class prob_3D_lander(object):
         self.om = CV['orbit']['argper']
         self.nu0 = CV['orbit']['ta']
         self.orb_deg = CV['orbit']['degrees']
-        self.DCM_I_Per = Rot_I_Perifocal(self.Om, self.inc, self.om, degrees=True)
-        self.o, self.odot = calc_o_odot(self.sma, self.ecc, self.nu0, self.mu)
+        self.DCM_I_Per = Rot_I_Perifocal(self.Om, self.inc, self.om, CV['orbit']['degrees'])
         self.r0_I,self.v0_I = elts_to_rv(self.sma,self.ecc,self.inc,self.Om,self.om,self.nu0,CP['mu'],CV['orbit']['degrees'])
         
         return
     
-    def get_nic(self):
-        return 2*self.npts + 1 + 1 + 1 + 1
-
     def get_nec(self):
-        return 13 + 7*(self.npts-1) + self.npts
+        P = self.nphases
+        npcs = sum([n-1 for n in self.npts])
+        npts_tot = sum(self.npts)
+        num_nec = int(3 + 3 + P + 3 + 3 + 2*3*(P-1) + 2*3*npcs + npcs + npts_tot)
+        return num_nec
+    
+    def get_nic(self):
+        P = self.nphases
+        npts_tot = sum(self.npts)
+        return int(npts_tot + P + 2*npts_tot + P + P + 1 + 1)
     
     # TODO: Set these bounds in a smarter fashion.
     def get_bounds(self):
         
-        sf_r = 0.3
-        sf_v = 2.0
-        rx_lb = [self.r0_I[0] - sf_r*norm(self.r0_I)] * self.npts
-        ry_lb = [self.r0_I[1] - sf_r*norm(self.r0_I)] * self.npts
-        rz_lb = [self.r0_I[2] - sf_r*norm(self.r0_I)] * self.npts
-        rx_ub = [self.r0_I[0] + sf_r*norm(self.r0_I)] * self.npts
-        ry_ub = [self.r0_I[1] + sf_r*norm(self.r0_I)] * self.npts
-        rz_ub = [self.r0_I[2] + sf_r*norm(self.r0_I)] * self.npts
+        sf_r = 20.0
+        sf_v = 3.0
+        rx_lb = [self.r0_I[0] - sf_r*norm(self.r0_I)] * sum(self.npts)
+        ry_lb = [self.r0_I[1] - sf_r*norm(self.r0_I)] * sum(self.npts)
+        rz_lb = [self.r0_I[2] - sf_r*norm(self.r0_I)] * sum(self.npts)
+        rx_ub = [self.r0_I[0] + sf_r*norm(self.r0_I)] * sum(self.npts)
+        ry_ub = [self.r0_I[1] + sf_r*norm(self.r0_I)] * sum(self.npts)
+        rz_ub = [self.r0_I[2] + sf_r*norm(self.r0_I)] * sum(self.npts)
         r_lb = rx_lb + ry_lb + rz_lb
         r_ub = rx_ub + ry_ub + rz_ub
-        v_lb = [-sf_v*norm(self.v0_I)]*3*self.npts
-        v_ub = [ sf_v*norm(self.v0_I)]*3*self.npts
-        u_lb = [-2]*3*self.npts
-        u_ub = [ 2]*3*self.npts
-        m_lb = [0.0]*self.npts
-        m_ub = [1.1*self.mass0]*self.npts
-        Eta_lb = [-0.1]*self.npts
-        Eta_ub = [1.1]*self.npts
-        T_lb = [100]
-        T_ub = [1000]
-        nu_lb = [-10.0]
+        v_lb = [-sf_v*norm(self.v0_I)]*3*sum(self.npts)
+        v_ub = [ sf_v*norm(self.v0_I)]*3*sum(self.npts)
+        u_lb = [-2]*3*sum(self.npts)
+        u_ub = [ 2]*3*sum(self.npts)
+        m_lb = [0.0]*sum(self.npts)
+        m_ub = [1.1*self.mass0]*sum(self.npts)
+        Eta_lb = [-0.1]*sum(self.npts)
+        Eta_ub = [1.1]*sum(self.npts)
+        T_lb = [0]*self.nphases
+        T_ub = [1000]*self.nphases
+        nu_lb = [-20.0]
         nu_ub = [10.0]
-        
-        LB = r_lb + v_lb + u_lb + m_lb + Eta_lb + T_lb + nu_lb
-        UB = r_ub + v_ub + u_ub + m_ub + Eta_ub + T_ub + nu_ub
-        
+        LB = r_lb + v_lb + u_lb + m_lb + Eta_lb + nu_lb + T_lb
+        UB = r_ub + v_ub + u_ub + m_ub + Eta_ub + nu_ub + T_ub
         return (LB, UB)
     
     def fitness(self, x):
@@ -115,456 +124,299 @@ class prob_3D_lander(object):
         return self.run_traj(x, plot_traj=1)
     
     def gradient(self, x):
-        
-        n = self.npts
-        nf = float(n)
-        Tm = self.Tmax
-        mu = self.mu
-        isp = self.isp
-        g0 = self.g0
-        Eta_lb = self.bnds_Eta[0]
-        Eta_ub = self.bnds_Eta[1]
-        nu_lb = self.bnds_nu[0]
-        nu_ub = self.bnds_nu[1]
-        T_lb = self.bnds_T[0]
-        T_ub = self.bnds_T[1]
-        Om = self.plOm
-        
-        # Extract state information
-        Rx      = x[(0*n)  :(1*n) ]
-        Ry      = x[(1*n)  :(2*n) ]
-        Rz      = x[(2*n)  :(3*n) ]
-        Vx      = x[(3*n)  :(4*n) ]
-        Vy      = x[(4*n)  :(5*n) ]
-        Vz      = x[(5*n)  :(6*n) ]
-        Ux      = x[(6*n)  :(7*n) ]
-        Uy      = x[(7*n)  :(8*n) ]
-        Uz      = x[(8*n)  :(9*n) ]
-        m       = x[(9*n)  :(10*n)]
-        Eta     = x[(10*n) :(11*n)]
-        tof     = x[11*n]
-        nu      = x[11*n + 1]
-
-        # Collocation timestep
-        dt = tof/nf
-        
-        # Zero gradient
-        arr_shape = (1 + 13 + 7*(n-1) + n + 2*n + 1 + 1 + 1 + 1, len(x))
-        grad = zeros(arr_shape)
-        
-        # Gradient estimation
-        # grade = pg.estimate_gradient_h(lambda x: self.fitness(x), x, 1e-5)
-        # arre = grade.reshape(arr_shape)
-        
-        # Matrices to use later
-        dbeyeneg = -1.0*eye(n-1, M = n, k = 0) + eye(n-1, M = n, k = 1)
-        dbeyepos =  1.0*eye(n-1, M = n, k = 0) + eye(n-1, M = n, k = 1)
-        
-        # Cost function partials
-        if self.objtype == 'control':
-            J = sum([ 0.5*dt*( (Tm*Eta[k]/m[k])**2.0 + (Tm*Eta[k+1]/m[k+1])**2.0 ) for k in range(0,n-1) ])
-            dJ_dm = [-dt*Tm**2.0*Eta[k]**2.0/m[k]**3.0 for k in range(0,n)]
-            dJ_dm[1:-1] = [2*a for a in dJ_dm[1:-1]]
-            dJ_dEta = [dt*Tm**2.0/m[k]**2.0*Eta[k] for k in range(0,n)]
-            dJ_dEta[1:-1] = [2*a for a in dJ_dEta[1:-1]]
-            dJ_dT = J/tof
-        elif self.objtype == 'fuel':
-            J = sum( [ 0.5*dt*( Eta[k+1] + Eta[k] ) for k in range(0, n-1) ] )
-            dJ_dm = zeros((n,))
-            dJ_dT = J/tof
-            dJ_dEta = 0.5*dt*ones((n))
-            dJ_dEta[1:-1] = [2.0*a for a in dJ_dEta[1:-1]]
-            
-        grad[0,( 9*n):(10*n)] = dJ_dm
-        grad[0,(10*n):(11*n)] = dJ_dEta 
-        grad[0,(11*n)] = dJ_dT
-
-        # Initial state constraints
-        grad[1,0*n] = 1.0
-        grad[2,1*n] = 1.0
-        grad[3,2*n] = 1.0
-        grad[4,3*n] = 1.0
-        grad[5,4*n] = 1.0
-        grad[6,5*n] = 1.0
-        grad[7,9*n] = 1.0
-
-        # True anomaly variability
-        ecc = self.ecc
-        sma = self.sma
-        nu1 = (nu)*pi/180
-        dnu1_dnu = pi/180
-        E = 2*arctan(sqrt((1-ecc)/(1+ecc)) * tan(nu1/2) )
-        B = sqrt((1-ecc)/(1+ecc))*tan(nu1/2)
-        rc = sma*(1-ecc*cos(E))
-        dB_dnu = 1/2*sqrt((1-ecc)/(1+ecc))*(1/cos(nu1/2)**2.0)*dnu1_dnu
-        dE_dnu = 2/(1+B**2.0)*dB_dnu
-        drc_dnu = sma*ecc*sin(E)*dE_dnu
-        do_dnu = rc*dnu1_dnu*array([-sin(nu1),cos(nu1),0]) + drc_dnu*array([cos(nu1),sin(nu1),0])
-        dr0_dnu = self.DCM_I_Per.inv().apply(do_dnu)
-        dodot_dnu = sqrt(mu*sma)*array([ 
-            (rc*-cos(E)*dE_dnu - -sin(E)*drc_dnu)/rc**2.0,  
-            (rc*sqrt(1-ecc**2.0)*-sin(E)*dE_dnu - sqrt(1-ecc**2.0)*cos(E)*drc_dnu)/rc**2.0,
-            0.0
-            ])
-        dv0_dnu = self.DCM_I_Per.inv().apply(dodot_dnu)
-        grad[1:4,11*n+1] = -dr0_dnu
-        grad[4:7,11*n+1] = -dv0_dnu
-        
-        # Final state constraints
-        grad[ 8,1*n-1] = 1.0
-        grad[ 9,2*n-1] = 1.0
-        grad[10,3*n-1] = 1.0
-        grad[11,4*n-1] = 1.0
-        grad[12,5*n-1] = 1.0
-        grad[13,6*n-1] = 1.0
-        
-        R_I_PF = Rot_I_PF(self.plOm, self.ep0, tof)
-        R_UEN_I = R_I_PF.inv() * self.R_UEN_PF
-        rLS_I = R_UEN_I.apply([self.R_eq + self.LS_alt,0,0])
-        rt_I = rLS_I + R_UEN_I.apply(self.rt_LS)
-        vt_I = R_UEN_I.apply(self.vt_LS) + cross([0,0,self.plOm],rt_I)
-        
-        Omvec = array([0,0,Om])
-        dRf_dt = -cross(Omvec, rt_I)
-        dVf_dt = -cross(Omvec, vt_I)
-        grad[ 8:11,11*n] = dRf_dt
-        grad[10:13,11*n] = dVf_dt
-
-        # print(arre[ 8:11,11*n])
-        # print(grad[ 8:11,11*n])
-        # print('grad')
-        # print(arre[11:14,11*n])
-        # print(grad[10:14,11*n])
-        
-        # Path equality constraints - Position
-        dRxp_dRx = dbeyeneg
-        dRyp_dRy = dbeyeneg
-        dRzp_dRz = dbeyeneg
-        dRxp_dVx = -0.5*dt*dbeyepos
-        dRyp_dVy = -0.5*dt*dbeyepos
-        dRzp_dVz = -0.5*dt*dbeyepos
-        dRxp_dT = [-0.5/nf*(Vx[k] + Vx[k+1]) for k in range(0,n-1)]
-        dRyp_dT = [-0.5/nf*(Vy[k] + Vy[k+1]) for k in range(0,n-1)]
-        dRzp_dT = [-0.5/nf*(Vz[k] + Vz[k+1]) for k in range(0,n-1)]
-        grad[(14+0*(n-1)):(14+1*(n-1)),(0*n):(1*n)] = dRxp_dRx
-        grad[(14+1*(n-1)):(14+2*(n-1)),(1*n):(2*n)] = dRyp_dRy
-        grad[(14+2*(n-1)):(14+3*(n-1)),(2*n):(3*n)] = dRzp_dRz
-        grad[(14+0*(n-1)):(14+1*(n-1)),(3*n):(4*n)] = dRxp_dVx
-        grad[(14+1*(n-1)):(14+2*(n-1)),(4*n):(5*n)] = dRyp_dVy
-        grad[(14+2*(n-1)):(14+3*(n-1)),(5*n):(6*n)] = dRzp_dVz
-        grad[(14+0*(n-1)):(14+1*(n-1)),(11*n)] = dRxp_dT
-        grad[(14+1*(n-1)):(14+2*(n-1)),(11*n)] = dRyp_dT
-        grad[(14+2*(n-1)):(14+3*(n-1)),(11*n)] = dRzp_dT
-        
-        # Path equality constraints - Velocity
-        dVxp_dVx = dbeyeneg
-        dVyp_dVy = dbeyeneg
-        dVzp_dVz = dbeyeneg
-        dVxp_dUx = zeros((n-1,n))
-        dVyp_dUy = zeros((n-1,n))
-        dVzp_dUz = zeros((n-1,n))
-        dVxp_dm = zeros((n-1,n))
-        dVyp_dm = zeros((n-1,n))
-        dVzp_dm = zeros((n-1,n))
-        dVxp_dEta = zeros((n-1,n))
-        dVyp_dEta = zeros((n-1,n))
-        dVzp_dEta = zeros((n-1,n))
-        dVxp_dT = zeros((n-1,))
-        dVyp_dT = zeros((n-1,))
-        dVzp_dT = zeros((n-1,))
-        dVxp_dRx = zeros((n-1,n))
-        dVxp_dRy = zeros((n-1,n))
-        dVxp_dRz = zeros((n-1,n))
-        dVyp_dRx = zeros((n-1,n))
-        dVyp_dRy = zeros((n-1,n))
-        dVyp_dRz = zeros((n-1,n))
-        dVzp_dRx = zeros((n-1,n))
-        dVzp_dRy = zeros((n-1,n))
-        dVzp_dRz = zeros((n-1,n))
-        for k in range(0, n-1):
-            dVxp_dUx[k,k] = -0.5*dt*Tm*Eta[k]/m[k]
-            dVyp_dUy[k,k] = -0.5*dt*Tm*Eta[k]/m[k]
-            dVzp_dUz[k,k] = -0.5*dt*Tm*Eta[k]/m[k]
-            dVxp_dUx[k,k+1] = -0.5*dt*Tm*Eta[k+1]/m[k+1]
-            dVyp_dUy[k,k+1] = -0.5*dt*Tm*Eta[k+1]/m[k+1]
-            dVzp_dUz[k,k+1] = -0.5*dt*Tm*Eta[k+1]/m[k+1]
-            dVxp_dm[k,k] = 0.5*dt*Tm*Eta[k]*Ux[k]/m[k]**2.0
-            dVyp_dm[k,k] = 0.5*dt*Tm*Eta[k]*Uy[k]/m[k]**2.0
-            dVzp_dm[k,k] = 0.5*dt*Tm*Eta[k]*Uz[k]/m[k]**2.0
-            dVxp_dm[k,k+1] = 0.5*dt*Tm*Eta[k+1]*Ux[k+1]/m[k+1]**2.0
-            dVyp_dm[k,k+1] = 0.5*dt*Tm*Eta[k+1]*Uy[k+1]/m[k+1]**2.0
-            dVzp_dm[k,k+1] = 0.5*dt*Tm*Eta[k+1]*Uz[k+1]/m[k+1]**2.0
-            dVxp_dEta[k,k] = -0.5*dt*Tm*Ux[k]/m[k]
-            dVyp_dEta[k,k] = -0.5*dt*Tm*Uy[k]/m[k]
-            dVzp_dEta[k,k] = -0.5*dt*Tm*Uz[k]/m[k]
-            dVxp_dEta[k,k+1] = -0.5*dt*Tm*Ux[k+1]/m[k+1]
-            dVyp_dEta[k,k+1] = -0.5*dt*Tm*Uy[k+1]/m[k+1]
-            dVzp_dEta[k,k+1] = -0.5*dt*Tm*Uz[k+1]/m[k+1]
-            Rk = (Rx[k]**2.0 + Ry[k]**2.0 + Rz[k]**2.0)**0.5
-            Rkp1 = (Rx[k+1]**2.0 + Ry[k+1]**2.0 + Rz[k+1]**2.0)**0.5
-            dVxp_dT[k] = - 0.5/nf*( (Tm*Eta[k]*Ux[k]/m[k]) + (Tm*Eta[k+1]*Ux[k+1]/m[k+1]) + (-mu/Rk**3.0)*Rx[k] + (-mu/Rkp1**3.0)*Rx[k+1] )
-            dVyp_dT[k] = - 0.5/nf*( (Tm*Eta[k]*Uy[k]/m[k]) + (Tm*Eta[k+1]*Uy[k+1]/m[k+1]) + (-mu/Rk**3.0)*Ry[k] + (-mu/Rkp1**3.0)*Ry[k+1] )
-            dVzp_dT[k] = - 0.5/nf*( (Tm*Eta[k]*Uz[k]/m[k]) + (Tm*Eta[k+1]*Uz[k+1]/m[k+1]) + (-mu/Rk**3.0)*Rz[k] + (-mu/Rkp1**3.0)*Rz[k+1] )
-            muoRk5 = mu/Rk**5.0
-            muoRk3 = mu/Rk**3.0
-            dVxp_dRx[k,k] = 3*muoRk5*Rx[k]*Rx[k] - muoRk3
-            dVxp_dRy[k,k] = 3*muoRk5*Rx[k]*Ry[k]
-            dVxp_dRz[k,k] = 3*muoRk5*Rx[k]*Rz[k]
-            dVyp_dRx[k,k] = 3*muoRk5*Ry[k]*Rx[k]
-            dVyp_dRy[k,k] = 3*muoRk5*Ry[k]*Ry[k] - muoRk3
-            dVyp_dRz[k,k] = 3*muoRk5*Ry[k]*Rz[k]
-            dVzp_dRx[k,k] = 3*muoRk5*Rz[k]*Rx[k]
-            dVzp_dRy[k,k] = 3*muoRk5*Rz[k]*Ry[k]
-            dVzp_dRz[k,k] = 3*muoRk5*Rz[k]*Rz[k] - muoRk3
-            muoRkp15 = mu/Rk**5.0
-            muoRkp13 = mu/Rk**3.0
-            dVxp_dRx[k,k+1] = 3*muoRkp15*Rx[k+1]*Rx[k+1] - muoRkp13
-            dVxp_dRy[k,k+1] = 3*muoRkp15*Rx[k+1]*Ry[k+1]
-            dVxp_dRz[k,k+1] = 3*muoRkp15*Rx[k+1]*Rz[k+1]
-            dVyp_dRx[k,k+1] = 3*muoRkp15*Ry[k+1]*Rx[k+1]
-            dVyp_dRy[k,k+1] = 3*muoRkp15*Ry[k+1]*Ry[k+1] - muoRkp13
-            dVyp_dRz[k,k+1] = 3*muoRkp15*Ry[k+1]*Rz[k+1]
-            dVzp_dRx[k,k+1] = 3*muoRkp15*Rz[k+1]*Rx[k+1]
-            dVzp_dRy[k,k+1] = 3*muoRkp15*Rz[k+1]*Ry[k+1]
-            dVzp_dRz[k,k+1] = 3*muoRkp15*Rz[k+1]*Rz[k+1] - muoRkp13
-        
-        grad[(14+3*(n-1)):(14+4*(n-1)),(0*n):(1*n)] = dVxp_dRx
-        grad[(14+3*(n-1)):(14+4*(n-1)),(1*n):(2*n)] = dVxp_dRy
-        grad[(14+3*(n-1)):(14+4*(n-1)),(2*n):(3*n)] = dVxp_dRz
-        grad[(14+4*(n-1)):(14+5*(n-1)),(0*n):(1*n)] = dVyp_dRx
-        grad[(14+4*(n-1)):(14+5*(n-1)),(1*n):(2*n)] = dVyp_dRy
-        grad[(14+4*(n-1)):(14+5*(n-1)),(2*n):(3*n)] = dVyp_dRz
-        grad[(14+5*(n-1)):(14+6*(n-1)),(0*n):(1*n)] = dVzp_dRx
-        grad[(14+5*(n-1)):(14+6*(n-1)),(1*n):(2*n)] = dVzp_dRy
-        grad[(14+5*(n-1)):(14+6*(n-1)),(2*n):(3*n)] = dVzp_dRz
-        grad[(14+3*(n-1)):(14+4*(n-1)),(3*n):(4*n)] = dVxp_dVx
-        grad[(14+4*(n-1)):(14+5*(n-1)),(4*n):(5*n)] = dVyp_dVy
-        grad[(14+5*(n-1)):(14+6*(n-1)),(5*n):(6*n)] = dVzp_dVz
-        grad[(14+3*(n-1)):(14+4*(n-1)),(6*n):(7*n)] = dVxp_dUx
-        grad[(14+4*(n-1)):(14+5*(n-1)),(7*n):(8*n)] = dVyp_dUy
-        grad[(14+5*(n-1)):(14+6*(n-1)),(8*n):(9*n)] = dVzp_dUz
-        grad[(14+3*(n-1)):(14+4*(n-1)),( 9*n):(10*n)] = dVxp_dm
-        grad[(14+4*(n-1)):(14+5*(n-1)),( 9*n):(10*n)] = dVyp_dm
-        grad[(14+5*(n-1)):(14+6*(n-1)),( 9*n):(10*n)] = dVzp_dm
-        grad[(14+3*(n-1)):(14+4*(n-1)),(10*n):(11*n)] = dVxp_dEta
-        grad[(14+4*(n-1)):(14+5*(n-1)),(10*n):(11*n)] = dVyp_dEta
-        grad[(14+5*(n-1)):(14+6*(n-1)),(10*n):(11*n)] = dVzp_dEta
-        grad[(14+3*(n-1)):(14+4*(n-1)),(11*n)] = dVxp_dT
-        grad[(14+4*(n-1)):(14+5*(n-1)),(11*n)] = dVyp_dT
-        grad[(14+5*(n-1)):(14+6*(n-1)),(11*n)] = dVzp_dT
-        
-        # Mass path partials
-        dmp_dm = -dbeyeneg
-        dmp_dEta = -0.5*dt*Tm/(g0*isp)*dbeyepos
-        dmp_dT = [-0.5/nf*Tm/(g0*isp)*(Eta[k]+Eta[k+1]) for k in range(0,n-1)]
-        grad[(14+6*(n-1)):(14+7*(n-1)),( 9*n):(10*n)] = dmp_dm
-        grad[(14+6*(n-1)):(14+7*(n-1)),(10*n):(11*n)] = dmp_dEta
-        grad[(14+6*(n-1)):(14+7*(n-1)),(11*n)] = dmp_dT
-        
-        # Thrust unit vector magnitudes
-        dUm_dUx = 2*diag(Ux)
-        dUm_dUy = 2*diag(Uy)
-        dUm_dUz = 2*diag(Uz)
-        grad[(14+7*(n-1)):(14+7*(n-1)+1*n),(6*n):(7*n)] = dUm_dUx
-        grad[(14+7*(n-1)):(14+7*(n-1)+1*n),(7*n):(8*n)] = dUm_dUy
-        grad[(14+7*(n-1)):(14+7*(n-1)+1*n),(8*n):(9*n)] = dUm_dUz
-        
-        # Inequality thrust magnitude constraints
-        dElb_dEta = -eye(n)
-        dEub_dEta = eye(n)
-        grad[(14+7*(n-1)+1*n):(14+7*(n-1)+2*n),(10*n):(11*n)] = dElb_dEta
-        grad[(14+7*(n-1)+2*n):(14+7*(n-1)+3*n),(10*n):(11*n)] = dEub_dEta
-        
-        # Inequality constraints for nu and T
-        grad[(14+7*(n-1)+3*n),(11*n+1)] = -1.0
-        grad[(14+7*(n-1)+3*n+1),(11*n+1)] = 1.0
-        grad[(14+7*(n-1)+3*n+2),(11*n)] = -1.0
-        grad[(14+7*(n-1)+3*n+3),(11*n)] = 1.0
-        
-        grad = grad.reshape((arr_shape[0]*arr_shape[1],))
-        return grad
+        return pg.estimate_gradient(lambda x: self.fitness(x), x, 1e-7)
     
     def run_traj(self, x, plot_traj=0, write_sum=0, write_csv=0):
-        
-        n = self.npts
-        nf = float(n)
-        Tm = self.Tmax
+        P = self.nphases
+        npcs = sum([n-1 for n in self.npts])
+        npt = sum(self.npts)
+        ns = self.npts
         mu = self.mu
-        isp = self.isp
         g0 = self.g0
-        Eta_lb = self.bnds_Eta[0]
-        Eta_ub = self.bnds_Eta[1]
-        nu_lb = self.bnds_nu[0]
-        nu_ub = self.bnds_nu[1]
-        T_lb = self.bnds_T[0]
-        T_ub = self.bnds_T[1]
+        Eta_lbs = self.Eta_lbs
+        Eta_ubs = self.Eta_ubs
+        T_lbs = self.T_lbs
+        T_ubs = self.T_ubs
+        nu_lb = self.nu_lb
+        nu_ub = self.nu_ub
+        
+        CP = self.C['planet']
+        CV = self.C['vehicle']
+        CT = self.C['target']
+        CO = self.C['opt']
+                
+        # Return lists
+        OBJVAL = []
+        CONSTR_EQ = []
+        CONSTR_INEQ = []
         
         # Extract state information
-        Rx      = x[(0*n)  :(1*n) ]
-        Ry      = x[(1*n)  :(2*n) ]
-        Rz      = x[(2*n)  :(3*n) ]
-        Vx      = x[(3*n)  :(4*n) ]
-        Vy      = x[(4*n)  :(5*n) ]
-        Vz      = x[(5*n)  :(6*n) ]
-        Ux      = x[(6*n)  :(7*n) ]
-        Uy      = x[(7*n)  :(8*n) ]
-        Uz      = x[(8*n)  :(9*n) ]
-        m       = x[(9*n)  :(10*n)]
-        Eta     = x[(10*n) :(11*n)]
-        tof     = x[11*n]
-        nu      = x[11*n + 1]
-
-        # Collocation timestep
-        dt = tof/nf
-
-        # Initial state requirement
+        Rx      = x[(0*npt)  :(1*npt)  ]
+        Ry      = x[(1*npt)  :(2*npt)  ]
+        Rz      = x[(2*npt)  :(3*npt)  ]
+        Vx      = x[(3*npt)  :(4*npt)  ]
+        Vy      = x[(4*npt)  :(5*npt)  ]
+        Vz      = x[(5*npt)  :(6*npt)  ]
+        Ux      = x[(6*npt)  :(7*npt)  ]
+        Uy      = x[(7*npt)  :(8*npt)  ]
+        Uz      = x[(8*npt)  :(9*npt)  ]
+        m       = x[(9*npt)  :(10*npt) ]
+        Eta     = x[(10*npt) :(11*npt) ]
+        nu      = x[11*npt]
+        tofs    = x[(11*npt+1):(11*npt + 1 + P)]
+        tof_tot = sum(tofs)
+        
+        # Cost function
+        J = 0
+        if self.objtype == 'control':
+            nidx0 = 0
+            for ii in range(0,P):
+                Tm = self.Tmaxs[self.phases[ii][1]]
+                dt = tofs[ii]/ns[ii]
+                J = J + sum([ 0.5*dt*( (Tm*Eta[k]/m[k])**2.0 + (Tm*Eta[k+1]/m[k+1])**2.0 ) for k in range(nidx0,nidx0 + ns[ii]-1) ])
+                nidx0 = nidx0 + ns[ii]    
+        elif self.objecttype == 'fuel':
+            nidx0 = 0
+            for ii in range(0,P):
+                dt = tofs[ii]/ns[ii]
+                J = J + sum( [ 0.5*dt*( Eta[k+1] + Eta[k] ) for k in range(nidx0,nidx0 + ns[ii]-1) ] )
+                nidx0 = nidx0 + ns[ii]
+        OBJVAL = [J]
+        
+        # Initial State equality constraint
         r0_I,v0_I = elts_to_rv(self.sma,self.ecc,self.inc,self.Om,self.om,nu,self.mu,self.orb_deg)
 
         # Landing site position
-        R_I_PF = Rot_I_PF(self.plOm, self.ep0, tof)
+        R_I_PF = Rot_I_PF(self.plOm, self.ep0, tof_tot)
         R_UEN_I = R_I_PF.inv() * self.R_UEN_PF
         rLS_I = R_UEN_I.apply([self.R_eq + self.LS_alt,0,0])
         rt_I = rLS_I + R_UEN_I.apply(self.rt_LS)
         vt_I = R_UEN_I.apply(self.vt_LS) + cross([0,0,self.plOm],rt_I)
         
-        # Starting and ending constraints
+        # Starting state constraints
         r0 = array([Rx[0],Ry[0],Rz[0]])
         v0 = array([Vx[0],Vy[0],Vz[0]])
+        CONSTR_EQ = CONSTR_EQ + list(r0-r0_I) + list(v0-v0_I)
+        
+        # Mass constraints. For starts of stages, ensure mass aligns directly
+        # with the total mass. Otherwise, match mass of previous stage's mass.
+        # First phase requires the former.
+        mcon_p0 = m[0] - sum([CV['stages'][k]['ms'] + CV['stages'][k]['mp'] for k in CV['phases'][0][0]])
+        CONSTR_EQ = CONSTR_EQ + [mcon_p0]
+        ns_p0 = len(self.phases[0][0])
+        nidx = ns[0]
+        for ii in range(1,P):
+            ns_pii = len(self.phases[ii][0])
+            if ns_pii > ns_p0:
+                print("ERROR: GAINING STAGES DURING DESCENT")
+            elif ns_pii < ns_p0:
+                mcon_pii = m[nidx + 0] - sum([CV['stages'][k]['ms'] + CV['stages'][k]['mp'] for k in CV['phases'][ii][0]])
+            elif ns_pii == ns_p0:
+                mcon_pii = m[nidx + 0] - m[nidx - 1]
+            nidx = nidx + ns[ii]
+            CONSTR_EQ = CONSTR_EQ + [mcon_pii]
+            
+        # Ending state constraints
         rf = array([Rx[-1],Ry[-1],Rz[-1]])
         vf = array([Vx[-1],Vy[-1],Vz[-1]])
-        CONSTR_EQ = \
-            list(r0-r0_I) + \
-            list(v0-v0_I) + \
-            [m[0] - self.mass0] + \
-            list(rf-rt_I) + \
-            list(vf-vt_I)
+        CONSTR_EQ = CONSTR_EQ + list(rf-rt_I) + list(vf-vt_I)
+        
+        # Phase boundary state constraints
+        nidx = ns[0]
+        for ii in range(0,P-1):
+            r0 = array([Rx[nidx-1],Ry[nidx-1],Rz[nidx-1]])
+            rf = array([Rx[nidx],Ry[nidx],Rz[nidx]])
+            CONSTR_EQ = CONSTR_EQ + list(r0-rf)
+            nidx = nidx + ns[ii+1]
+        nidx = ns[0]
+        for ii in range(0,P-1):    
+            v0 = array([Vx[nidx-1],Vy[nidx-1],Vz[nidx-1]])
+            vf = array([Vx[nidx],Vy[nidx],Vz[nidx]])
+            CONSTR_EQ = CONSTR_EQ + list(v0-vf)
+            nidx = nidx + ns[ii+1]
             
-        # Equality path constraints
-        Rxp = [(Rx[k+1]-Rx[k]) - 0.5*dt*(Vx[k]+Vx[k+1]) for k in range(0,n-1)]
-        Ryp = [(Ry[k+1]-Ry[k]) - 0.5*dt*(Vy[k]+Vy[k+1]) for k in range(0,n-1)]
-        Rzp = [(Rz[k+1]-Rz[k]) - 0.5*dt*(Vz[k]+Vz[k+1]) for k in range(0,n-1)]
+        # Path constraints - position
+        idx0 = 0
+        Rxp = []
+        Ryp = []
+        Rzp = []
+        for ii in range(0,P):
+            dt = tofs[ii]/ns[ii]
+            Rxp = Rxp + [(Rx[idx0+k+1]-Rx[idx0+k]) - 0.5*dt*(Vx[idx0+k]+Vx[idx0+k+1]) for k in range(0,ns[ii]-1)]
+            Ryp = Ryp + [(Ry[idx0+k+1]-Ry[idx0+k]) - 0.5*dt*(Vy[idx0+k]+Vy[idx0+k+1]) for k in range(0,ns[ii]-1)]
+            Rzp = Rzp + [(Rz[idx0+k+1]-Rz[idx0+k]) - 0.5*dt*(Vz[idx0+k]+Vz[idx0+k+1]) for k in range(0,ns[ii]-1)]
+            idx0 = idx0+ ns[ii]
+        CONSTR_EQ = CONSTR_EQ + Rxp + Ryp + Rzp
+        
+        # Path constraints - velocity
+        idx0 = 0
         Vxp = []
         Vyp = []
         Vzp = []
-        for k in range(0,n-1):
-            Rk = (Rx[k]**2.0 + Ry[k]**2.0 + Rz[k]**2.0)**0.5
-            Rkp1 = (Rx[k+1]**2.0 + Ry[k+1]**2.0 + Rz[k+1]**2.0)**0.5
-            Vxp = Vxp + [ (Vx[k+1]-Vx[k]) - 0.5*dt*( (Tm*Eta[k]*Ux[k]/m[k]) + (Tm*Eta[k+1]*Ux[k+1]/m[k+1]) + (-mu/Rk**3.0)*Rx[k] + (-mu/Rkp1**3.0)*Rx[k+1] ) ]
-            Vyp = Vyp + [ (Vy[k+1]-Vy[k]) - 0.5*dt*( (Tm*Eta[k]*Uy[k]/m[k]) + (Tm*Eta[k+1]*Uy[k+1]/m[k+1]) + (-mu/Rk**3.0)*Ry[k] + (-mu/Rkp1**3.0)*Ry[k+1] ) ]
-            Vzp = Vzp + [ (Vz[k+1]-Vz[k]) - 0.5*dt*( (Tm*Eta[k]*Uz[k]/m[k]) + (Tm*Eta[k+1]*Uz[k+1]/m[k+1]) + (-mu/Rk**3.0)*Rz[k] + (-mu/Rkp1**3.0)*Rz[k+1] ) ]
-        mp = [ (m[k] - m[k+1]) - 0.5*dt*Tm/(g0*isp)*( Eta[k] + Eta[k+1] ) for k in range(0,n-1) ]
-        Um = [ Ux[k]**2.0 + Uy[k]**2.0 + Uz[k]**2.0 - 1.0 for k in range(0,n) ]
-        CONSTR_EQ = CONSTR_EQ + Rxp + Ryp + Rzp + Vxp + Vyp + Vzp + mp + Um
-
-        # Inequality throttle constraints
-        Eta_bound_0 = [Eta_lb - Eta[k] for k in range(0,n)]
-        Eta_bound_f = [Eta[k] - Eta_ub for k in range(0,n)]
-        CONSTR_INEQ = Eta_bound_0 + Eta_bound_f
+        for ii in range(0,P):
+            Tm = self.Tmaxs[self.phases[ii][1]]
+            dt = tofs[ii]/ns[ii]
+            for k in range(0,ns[ii]-1):
+                idx = k + idx0
+                Ridx = (Rx[idx]**2.0 + Ry[idx]**2.0 + Rz[idx]**2.0)**0.5
+                Ridxp1 = (Rx[idx+1]**2.0 + Ry[idx+1]**2.0 + Rz[idx+1]**2.0)**0.5
+                Vxp = Vxp + [ (Vx[idx+1]-Vx[idx]) - 0.5*dt*( (Tm*Eta[idx]*Ux[idx]/m[idx]) + (Tm*Eta[idx+1]*Ux[idx+1]/m[idx+1]) + (-mu/Ridx**3.0)*Rx[idx] + (-mu/Ridxp1**3.0)*Rx[idx+1] ) ]
+                Vyp = Vyp + [ (Vy[idx+1]-Vy[idx]) - 0.5*dt*( (Tm*Eta[idx]*Uy[idx]/m[idx]) + (Tm*Eta[idx+1]*Uy[idx+1]/m[idx+1]) + (-mu/Ridx**3.0)*Ry[idx] + (-mu/Ridxp1**3.0)*Ry[idx+1] ) ]
+                Vzp = Vzp + [ (Vz[idx+1]-Vz[idx]) - 0.5*dt*( (Tm*Eta[idx]*Uz[idx]/m[idx]) + (Tm*Eta[idx+1]*Uz[idx+1]/m[idx+1]) + (-mu/Ridx**3.0)*Rz[idx] + (-mu/Ridxp1**3.0)*Rz[idx+1] ) ]
+            idx0 = idx0+ ns[ii]
+        CONSTR_EQ = CONSTR_EQ + Vxp + Vyp + Vzp
         
-        # Time and nu constraints
-        nu_const_lb = nu_lb - nu
-        nu_constr_ub = nu - nu_ub
-        T_constr_lb = T_lb - tof
-        T_constr_ub = tof - T_ub
-        CONSTR_INEQ = CONSTR_INEQ + [nu_const_lb] + [nu_constr_ub] + [T_constr_lb] + [T_constr_ub] 
+        # Path constraints - mass
+        idx0 = 0
+        mp = []
+        for ii in range(0,P):
+            Tm = self.Tmaxs[self.phases[ii][1]]
+            dt = tofs[ii]/ns[ii]
+            isp = self.isps[self.phases[ii][1]]
+            mp = mp + [ (m[idx0+k] - m[idx0+k+1]) - 0.5*dt*Tm/(g0*isp)*( Eta[idx0+k] + Eta[idx0+k+1] ) for k in range(0,ns[ii]-1) ]
+            idx0 = idx0 + ns[ii]
+        CONSTR_EQ = CONSTR_EQ + mp
         
-        # Other objective - minimize control effort
-        if self.objtype == 'control':
-            OBJVAL = [ sum([ 0.5*dt*( (Tm*Eta[k]/m[k])**2.0 + (Tm*Eta[k+1]/m[k+1])**2.0 ) for k in range(0,n-1) ]) ]
-        elif self.objtype == 'fuel':
-            OBJVAL = [ sum( [ 0.5*dt*( Eta[k+1] + Eta[k] ) for k in range(0, n-1) ] ) ]
-            
-        # Landing site position
-        X = Rx - rt_I[0]
-        Y = Ry - rt_I[1]
-        Z = Rz - rt_I[2]
-
-        # Plot, if enabled
-        if plot_traj == 1:
-            t_arr = linspace(0,tof,n)
-            
-            fig = plt.figure(1)
-            ax = fig.gca(projection='3d')
-            ax.set_xlim(-400000,400000)
-            ax.set_ylim(-40000,40000)
-            ax.set_zlim(-100000,100000)
-            plt.title('Position (Landing Site)')
-            
-            alt = [norm([Rx[k], Ry[k], Rz[k]]) - self.R_eq for k in range(0,n) ]
-            
-            # Landing site position
-            X = Rx - rt_I[0]
-            Y = Ry - rt_I[1]
-            Z = Rz - rt_I[2]
-            
-            # max_range = array([X.max()-X.min(), Y.max()-Y.min(), Z.max()-Z.min()]).max()
-            # Xb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][0].flatten() + 0.5*(X.max()+X.min())
-            # Yb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][1].flatten() + 0.5*(Y.max()+Y.min())
-            # Zb = 0.5*max_range*mgrid[-1:2:2,-1:2:2,-1:2:2][2].flatten() + 0.5*(Z.max()+Z.min())
-            # # Comment or uncomment following both lines to test the fake bounding box:
-            # for xb, yb, zb in zip(Xb, Yb, Zb):
-            #    ax.plot([yb], [zb], [xb], 'w')
-            
-            ax.plot(Y, Z, X,'*-b')
-
-            fout = open('OUT.csv', 'w+')
+        # Control vector magnitudes
+        Um = [ Ux[k]**2.0 + Uy[k]**2.0 + Uz[k]**2.0 - 1.0 for k in range(0,npt) ]
+        CONSTR_EQ = CONSTR_EQ + Um
+        
+        # Radius magnitude values - above surface!
+        Rmag = [ -(Rx[k]**2.0 + Ry[k]**2.0 + Rz[k]**2.0 - self.R_eq**2.0)/self.R_eq**2.0 for k in range(0,npt) ]
+        CONSTR_INEQ = CONSTR_INEQ + Rmag
+        
+        # Final mass inequality constraint. For this one, add up all mass of
+        # current phase stages, and subtract out the prop mass of the stage 
+        # currently in use. That is the minimum allowed mass at the end of
+        # this specific phase.
+        idx0 = 0
+        mcon_final = []
+        for ii in range(0,P):
+            mf_min = sum([CV['stages'][k]['ms'] + CV['stages'][k]['mp'] for k in CV['phases'][ii][0]]) - CV['stages'][ CV['phases'][ii][0][0] ]['mp']
+            mcon_final = mcon_final + [ mf_min - m[idx0 + ns[ii] - 1] ]
+            idx0 = idx0 + ns[ii]
+        CONSTR_INEQ = CONSTR_INEQ + mcon_final
+        
+        # Throttle inequality constraints and time constraints
+        idx0 = 0
+        eta_lb_con = []
+        eta_ub_con = []
+        T_lb_con = []
+        T_ub_con = []
+        for ii in range(0,P):
+            eta_lb_con = eta_lb_con + [Eta_lbs[ii] - Eta[idx0+k] for k in range(0,ns[ii])]
+            eta_ub_con = eta_ub_con + [Eta[idx0+k] - Eta_ubs[ii] for k in range(0,ns[ii])]
+            T_lb_con = T_lb_con + [T_lbs[ii] - tofs[ii]]
+            T_ub_con = T_ub_con + [tofs[ii] - T_ubs[ii]]
+            idx0 = idx0 + ns[ii]
+        CONSTR_INEQ = CONSTR_INEQ + eta_lb_con + eta_ub_con + T_lb_con + T_ub_con
+        
+        # Nu constraints
+        CONSTR_INEQ = CONSTR_INEQ + [nu_lb - nu] + [nu - nu_ub]
+        
+        # Summarize output
+        if write_sum == True:
+            print("Total TOF:       %10.3f sec"%(sum(tofs)))
+            print("    TOF 1:       %10.3f sec"%(tofs[0]))
+            print("    TOF 2:       %10.3f sec"%(tofs[1]))
+            print("    TOF 3:       %10.3f sec"%(tofs[2]))
+            print("Final Mass:      %10.3f kg"%(m[-1]))
+            print("  M0 Final:      %10.3f kg"%(m[ns[0]-1] - 8000 - 1000 - 1000))
+        
+        alt = array([norm([Rx[k], Ry[k], Rz[k]]) - self.R_eq for k in range(0,npt) ])
+        if write_csv == True:
+            fout = open('OUT_mp.csv', 'w+')
             fout.write('Time,Alt,Eta,Mass,rLSx,rLSy,rLSz,vLSx,vLSy,vLSz\n')
-            for ii in range(0,n):
+            t_arr = list(linspace(0,tofs[0],ns[0])) + \
+                list(linspace(tofs[0],tofs[0]+tofs[1],ns[1])) + \
+                list(linspace(tofs[0]+tofs[1],tofs[0]+tofs[1]+tofs[2],ns[2]))
+            for ii in range(0,npt):
                 outstr = ","
                 outstr = outstr.join([ '%.20f'%(ll) for ll in [t_arr[ii],alt[ii],Eta[ii],m[ii],\
                                       Rx[ii]-rt_I[0],Ry[ii]-rt_I[1],Rz[ii]-rt_I[2],\
                                       Vx[ii]-vt_I[0],Vy[ii]-vt_I[1],Vz[ii]-vt_I[2] ] ]+ ["\n"] )
                 fout.write(outstr)
             fout.close()
+        
+        # Plot trajectory output
+        if plot_traj == 1:
             
-            for ii in range(0,n):
-                fac = 200000
-                Xs = [Rx[ii]- rt_I[0], Rx[ii]- rt_I[0] + fac*Ux[ii]*Eta[ii]**2.0]
-                Ys = [Ry[ii]- rt_I[1], Ry[ii]- rt_I[1] + fac*Uy[ii]*Eta[ii]**2.0]
-                Zs = [Rz[ii]- rt_I[2], Rz[ii]- rt_I[2] + fac*Uz[ii]*Eta[ii]**2.0]
-                ax.plot(Ys,Zs,Xs,'r')
-
-            plt.figure(2)
-            plt.subplot(2,2,1)
-            plt.plot(t_arr,Eta,'*-b')
+            # Throttle
+            plt.figure(1)
+            t0 = 0.0
+            idx0 = 0
+            cols = ['*-r','*-b','*-g','*-k','*-m']
+            for ii in range(0,P):
+                tarr = linspace(t0, t0 + tofs[ii], ns[ii])
+                Etas = Eta[idx0:(idx0+ns[ii])]
+                plt.plot(tarr,Etas,cols[ii])
+                idx0 = idx0 + ns[ii]
+                t0 = t0 + tofs[ii]
             plt.minorticks_on()
             plt.grid(which='major', linestyle='-', linewidth='0.5')
             plt.grid(which='minor', linestyle=':', linewidth='0.5')
             plt.xlabel('Time (sec)')
             plt.ylabel('Throttle (-)')
-            plt.title('Throttle')
             
+            # Mass
             plt.figure(2)
-            plt.subplot(2,2,2)
-            plt.plot(t_arr, alt,'*-b')
-            plt.minorticks_on()
-            plt.grid(which='major', linestyle='-', linewidth='0.5')
-            plt.grid(which='minor', linestyle=':', linewidth='0.5')
-            plt.xlabel('Time (sec)')
-            plt.ylabel('Alt (km)')
-            plt.title('Altitude')
-            
-            plt.figure(2)
-            plt.subplot(2,2,3)
-            plt.plot(t_arr, m,'*-b')
+            t0 = 0.0
+            idx0 = 0
+            for ii in range(0,P):
+                tarr = linspace(t0, t0 + tofs[ii], ns[ii])
+                ms = m[idx0:(idx0+ns[ii])]
+                plt.plot(tarr,ms,cols[ii])
+                idx0 = idx0 + ns[ii]
+                t0 = t0 + tofs[ii]
             plt.minorticks_on()
             plt.grid(which='major', linestyle='-', linewidth='0.5')
             plt.grid(which='minor', linestyle=':', linewidth='0.5')
             plt.xlabel('Time (sec)')
             plt.ylabel('Mass (kg)')
-            plt.title('Mass')
             
-            print("FINAL MASS: %.3f kg"%(m[-1]))
-            print("TOF:        %.3f sec"%(tof))
-            print("TA:         %.3f deg"%(nu))
+            # Altitude
+            
+            plt.figure(3)
+            t0 = 0.0
+            idx0 = 0
+            cols = ['*-r','*-b','*-g']
+            for ii in range(0,P):
+                tarr = linspace(t0, t0 + tofs[ii], ns[ii])
+                alts = alt[idx0:(idx0+ns[ii])]
+                plt.plot(tarr,0.001*alts,cols[ii])
+                idx0 = idx0 + ns[ii]
+                t0 = t0 + tofs[ii]
+            plt.minorticks_on()
+            plt.grid(which='major', linestyle='-', linewidth='0.5')
+            plt.grid(which='minor', linestyle=':', linewidth='0.5')
+            plt.xlabel('Time (sec)')
+            plt.ylabel('Altitude (km)')
+            
+            fig = plt.figure(4)
+            ax = fig.gca(projection='3d')
+            ax.set_xlim(-400000,400000)
+            ax.set_ylim(-40000,40000)
+            ax.set_zlim(-100000,100000)
+            plt.title('Position (Landing Site)')
+            X = Rx - rt_I[0]
+            Y = Ry - rt_I[1]
+            Z = Rz - rt_I[2]
+            ax.plot(Y[0:ns[0]], Z[0:ns[0]], X[0:ns[0]],'*-r')
+            ax.plot(Y[(ns[0]):(ns[0]+ns[1])], Z[(ns[0]):(ns[0]+ns[1])], X[(ns[0]):(ns[0]+ns[1])],'*-b')
+            ax.plot(Y[(ns[0]+ns[1]):(ns[0]+ns[1]+ns[2])], Z[(ns[0]+ns[1]):(ns[0]+ns[1]+ns[2])], X[(ns[0]+ns[1]):(ns[0]+ns[1]+ns[2])],'*-g')
+            for ii in range(0,npt):
+                fac = 200000
+                Xs = [Rx[ii]- rt_I[0], Rx[ii]- rt_I[0] + fac*Ux[ii]*Eta[ii]**2.0]
+                Ys = [Ry[ii]- rt_I[1], Ry[ii]- rt_I[1] + fac*Uy[ii]*Eta[ii]**2.0]
+                Zs = [Rz[ii]- rt_I[2], Rz[ii]- rt_I[2] + fac*Uz[ii]*Eta[ii]**2.0]
+                ax.plot(Ys,Zs,Xs,'k')
+                
             plt.show()
-
-        # Return everything
+        
         return OBJVAL + CONSTR_EQ + CONSTR_INEQ
 
-
 # TODO: Add omega x r terms for rotating planet
-def run_problem3(config_file):
+def run_problem5(config_file):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method
@@ -578,12 +430,12 @@ def run_problem3(config_file):
     CP = C['planet']
     CV = C['vehicle']
     CT = C['target']
+    CO = C['opt']
     
     # Problem and optimization configuration
-    udp = prob_3D_lander(C)
+    udp = prob_3D_lander_multiphase(C)
     prob = pg.problem(udp)
     prob.c_tol = opt_config['c_tol']
-    npts = opt_config['npts']
     uda = pg.algorithm(pg.nlopt(opt_config['nlopt_alg']))
     uda.set_verbosity(opt_config['verbosity'])
     uda.extract(pg.nlopt).xtol_rel = opt_config['xtol_rel']
@@ -598,18 +450,31 @@ def run_problem3(config_file):
         X0 = Xdata_in['X0']
 
         file_npts = Xdata_in['npts']
-        if not (file_npts == npts):
-            X0new = []
-            for ii in range(0,11):
-                X0new = X0new + recast_pts(X0[ii*file_npts:(ii+1)*file_npts],npts) 
-            X0 = X0new + [X0[-2]] + [X0[-1]]
+        npts = opt_config['npts']
+        idx0 = 0
+        for ii in range(0,len(file_npts)):
+            if not (file_npts[ii] == npts[ii]):
+                print("MISMATCH ", npts[ii], "  -  ",file_npts[ii])
+            idx0 = idx0 + npts[ii]
+
+        # if not (file_npts == npts):
+        #     X0new = []
+        #     for ii in range(0,11):
+        #         X0new = X0new + recast_pts(X0[ii*file_npts:(ii+1)*file_npts],npts) 
+        #     X0 = X0new + [X0[-2]] + [X0[-1]]
     
     # Initial guess - linear profile
     elif opt_in['use_linear_guess']:
         print('CONSTRUCTING LINEAR INITIAL GUESS')
+        
         opt_lg = opt_in['linear_guess']
-        tof = opt_lg['tof']
+        npts = sum(opt_config['npts'])
+        ns = opt_config['npts']
+        tof = sum(opt_lg['tof'])
         nu0 = opt_lg['nu0']
+        mass0 = sum([CV['stages'][ii]['ms'] + CV['stages'][ii]['mp'] for ii in CV['phases'][0][0]])
+        isp0 = CV['engines'][CV['phases'][0][1]]['isp']
+        tmax0 = CV['engines'][CV['phases'][0][1]]['Tmax']
         
         # Initial state
         ra = CP['R_eq'] + CV['orbit']['alta']
@@ -635,14 +500,21 @@ def run_problem3(config_file):
         dt = tof/npts
         R = linspace(r0_I, rt_I, npts).transpose()
         V = linspace(v0_I, vt_I, npts).transpose()
-        Ux = [1.0] + [(V[0,k+1] - V[0,k])/dt/norm(V[:,k]) for k in range(0,npts-1)]
-        Uy = [1.0] + [(V[1,k+1] - V[1,k])/dt/norm(V[:,k]) for k in range(0,npts-1)]
-        Uz = [1.0] + [(V[2,k+1] - V[2,k])/dt/norm(V[:,k]) for k in range(0,npts-1)]
+        Ux = [1.0] + [(V[0,k+1] - V[0,k])/dt for k in range(0,npts-1)]
+        Uy = [1.0] + [(V[1,k+1] - V[1,k])/dt for k in range(0,npts-1)]
+        Uz = [1.0] + [(V[2,k+1] - V[2,k])/dt for k in range(0,npts-1)]
+        for kk in range(0,len(Ux)):
+            Umag = (Ux[kk]**2.0 + Uy[kk]**2.0 + Uz[kk]**2.0 )**0.5
+            Ux[kk] = Ux[kk]/Umag
+            Uy[kk] = Uy[kk]/Umag
+            Uz[kk] = Uz[kk]/Umag 
         U = array([Ux, Uy, Uz])
-        m = linspace(CV['mass']*opt_lg['mfrac_0'], CV['mass']*opt_lg['mfrac_f'], npts)
-        Eta =  [1.0] + [(m[k]-m[k+1])/dt*9.81*CV['isp']/CV['Tmax']  for k in range(0,npts-1)] # linspace(opt_lg['eta_0'],opt_lg['eta_f'], npts)
-        X0 = list(R.flatten()) + list(V.flatten()) + list(U.flatten()) + list(m) + list(Eta) + [tof] + [nu0]
-        
+        Eta = [0.7]*ns[0] + [0.0]*ns[1] + [0.7]*ns[2]
+        m = [mass0]
+        for k in range(1,npts):
+            m = m + [m[k-1] - tmax0*Eta[k]/(9.81*isp0)]
+        X0 = list(R.flatten()) + list(V.flatten()) + list(U.flatten()) + list(m) + list(Eta) + [nu0] + opt_lg['tof']
+
     # Create a population
     print("Creating population...")
     pop = pg.population(prob)
@@ -669,7 +541,7 @@ def run_problem3(config_file):
         
     if opt_out['write_X']:
         print('WRITING TO FILE')
-        outdict = { 'npts':npts, 'X0':list(pop.champion_x) }
+        outdict = { 'npts':list(opt_config['npts']), 'X0':list(pop.champion_x) }
         if (not opt_out['only_write_feasible']) or (opt_out['only_write_feasible'] and is_feas):
             json.dump(outdict, open(opt_out['file_X_out'],'w+'), indent=4)
         

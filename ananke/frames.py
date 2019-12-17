@@ -17,7 +17,7 @@ def Rot_I_Perifocal(Om, i, om, degrees=True):
         i  = i  * pi/180
         om = om * pi/180
         
-    R1 = R.from_dcm([
+    R3 = R.from_dcm([
         [cos(-om),sin(-om),0],
         [-sin(-om),cos(-om),0],
         [0,0,1]
@@ -29,7 +29,7 @@ def Rot_I_Perifocal(Om, i, om, degrees=True):
         [0,-sin(-i),cos(-i)]
         ]).inv()
     
-    R3 = R.from_dcm([
+    R1 = R.from_dcm([
         [cos(-Om),sin(-Om),0],
         [-sin(-Om),cos(-Om),0],
         [0,0,1]
