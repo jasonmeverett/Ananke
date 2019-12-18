@@ -12,17 +12,17 @@
         {
             "alta": 100000.0,
             "altp": 15000.0,
-            "inc": 3.0,
-            "raan": 3.0,
-            "argper": -15.0,
-            "ta": -7.0,
+            "inc": 0.0,
+            "raan": 0.0,
+            "argper": 0.0,
+            "ta": -15.0,
             "degrees":true
         },
         "stages": 
         [
             {
-                "ms": 1000.0,
-                "mp": 5000.0
+                "ms": 5500.0,
+                "mp": 500.0
             },
             {
                 "ms": 1000.0,
@@ -64,33 +64,33 @@
     },
     "opt":
     {    
-        "evolve": false,
+        "evolve": true,
         "objtype": "control",
         "config":
         {
-            "npts": [10,5,10],
+            "npts": [10,5,15],
             "nlopt_alg": "slsqp",
-            "verbosity": 5,
+            "verbosity": 20,
             "c_tol": 0.01,
             "xtol_rel": 0.0,
             "ftol_rel": 0.0,
-            "maxeval": 100,
+            "maxeval": 1000,
             "use_mbh_wrapper": false,
             "mbh":
             {
-                "stop": 3,
+                "stop": 2,
                 "perturb": 0.01
             }
         },
         "input":
         {
             "guess_from_file": true,
-            "in_file": "x_final.json",
+            "in_file": "Xout.json",
             "use_linear_guess": true,
             "linear_guess":
             {
-                "tof": [300.0,300.0,300.0],
-                "nu0": -7.0,
+                "tof": [100.0,50.0,300.0],
+                "nu0": -15.0,
                 "mfrac_0": 1.0,
                 "mfrac_f": 0.6,
                 "eta_0": 0.8,
@@ -101,15 +101,15 @@
         {
             "lo":
             {
-                "T": [50.0,50.0,50.0],
-                "eta": [0.2, 0.0, 0.2],
-                "nu0": -7.0
+                "T": [10.0,50.0,50.0],
+                "eta": [1.0, 0.0, 0.2],
+                "nu0": -14.0
             },
             "hi":
             {
                 "T": [400.0, 200.0, 700.0],
-                "eta": [0.8, 0.0, 0.8],
-                "nu0": -7.0
+                "eta": [1.0, 0.0, 0.8],
+                "nu0": -14.0
             }
         },
         "output":
@@ -119,9 +119,9 @@
             "only_write_feasible": false,
             "write_sum": true,
             "write_csv": true,
-            "file_X_out": "x_final.json",
+            "file_X_out": "Xout.json",
             "file_sum_out": "summary.json",
-            "file_csv_out": "output.csv"
+            "file_csv_out": "OUT.csv"
         }
     }
 }

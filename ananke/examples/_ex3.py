@@ -80,7 +80,7 @@ class prob_3D_lander(object):
     # TODO: Set these bounds in a smarter fashion.
     def get_bounds(self):
         
-        sf_r = 0.3
+        sf_r = 1.0
         sf_v = 2.0
         rx_lb = [self.r0_I[0] - sf_r*norm(self.r0_I)] * self.npts
         ry_lb = [self.r0_I[1] - sf_r*norm(self.r0_I)] * self.npts
@@ -92,16 +92,16 @@ class prob_3D_lander(object):
         r_ub = rx_ub + ry_ub + rz_ub
         v_lb = [-sf_v*norm(self.v0_I)]*3*self.npts
         v_ub = [ sf_v*norm(self.v0_I)]*3*self.npts
-        u_lb = [-2]*3*self.npts
-        u_ub = [ 2]*3*self.npts
+        u_lb = [-5]*3*self.npts
+        u_ub = [ 5]*3*self.npts
         m_lb = [0.0]*self.npts
-        m_ub = [1.1*self.mass0]*self.npts
-        Eta_lb = [-0.1]*self.npts
-        Eta_ub = [1.1]*self.npts
-        T_lb = [100]
+        m_ub = [2.1*self.mass0]*self.npts
+        Eta_lb = [-0.5]*self.npts
+        Eta_ub = [1.5]*self.npts
+        T_lb = [10]
         T_ub = [1000]
-        nu_lb = [-10.0]
-        nu_ub = [10.0]
+        nu_lb = [-15.0]
+        nu_ub = [15.0]
         
         LB = r_lb + v_lb + u_lb + m_lb + Eta_lb + T_lb + nu_lb
         UB = r_ub + v_ub + u_ub + m_ub + Eta_ub + T_ub + nu_ub
@@ -153,7 +153,7 @@ class prob_3D_lander(object):
         grad = zeros(arr_shape)
         
         # Gradient estimation
-        # grade = pg.estimate_gradient_h(lambda x: self.fitness(x), x, 1e-5)
+        # grade = pg.estimate_gradient_h(lambda x: self.fitness(x), x, 1e-4)
         # arre = grade.reshape(arr_shape)
         
         # Matrices to use later
@@ -257,6 +257,7 @@ class prob_3D_lander(object):
         grad[(14+2*(n-1)):(14+3*(n-1)),(11*n)] = dRzp_dT
         
         # Path equality constraints - Velocity
+        # TODO: FIX THESE
         dVxp_dVx = dbeyeneg
         dVyp_dVy = dbeyeneg
         dVzp_dVz = dbeyeneg
@@ -307,26 +308,26 @@ class prob_3D_lander(object):
             dVzp_dT[k] = - 0.5/nf*( (Tm*Eta[k]*Uz[k]/m[k]) + (Tm*Eta[k+1]*Uz[k+1]/m[k+1]) + (-mu/Rk**3.0)*Rz[k] + (-mu/Rkp1**3.0)*Rz[k+1] )
             muoRk5 = mu/Rk**5.0
             muoRk3 = mu/Rk**3.0
-            dVxp_dRx[k,k] = 3*muoRk5*Rx[k]*Rx[k] - muoRk3
-            dVxp_dRy[k,k] = 3*muoRk5*Rx[k]*Ry[k]
-            dVxp_dRz[k,k] = 3*muoRk5*Rx[k]*Rz[k]
-            dVyp_dRx[k,k] = 3*muoRk5*Ry[k]*Rx[k]
-            dVyp_dRy[k,k] = 3*muoRk5*Ry[k]*Ry[k] - muoRk3
-            dVyp_dRz[k,k] = 3*muoRk5*Ry[k]*Rz[k]
-            dVzp_dRx[k,k] = 3*muoRk5*Rz[k]*Rx[k]
-            dVzp_dRy[k,k] = 3*muoRk5*Rz[k]*Ry[k]
-            dVzp_dRz[k,k] = 3*muoRk5*Rz[k]*Rz[k] - muoRk3
-            muoRkp15 = mu/Rk**5.0
-            muoRkp13 = mu/Rk**3.0
-            dVxp_dRx[k,k+1] = 3*muoRkp15*Rx[k+1]*Rx[k+1] - muoRkp13
-            dVxp_dRy[k,k+1] = 3*muoRkp15*Rx[k+1]*Ry[k+1]
-            dVxp_dRz[k,k+1] = 3*muoRkp15*Rx[k+1]*Rz[k+1]
-            dVyp_dRx[k,k+1] = 3*muoRkp15*Ry[k+1]*Rx[k+1]
-            dVyp_dRy[k,k+1] = 3*muoRkp15*Ry[k+1]*Ry[k+1] - muoRkp13
-            dVyp_dRz[k,k+1] = 3*muoRkp15*Ry[k+1]*Rz[k+1]
-            dVzp_dRx[k,k+1] = 3*muoRkp15*Rz[k+1]*Rx[k+1]
-            dVzp_dRy[k,k+1] = 3*muoRkp15*Rz[k+1]*Ry[k+1]
-            dVzp_dRz[k,k+1] = 3*muoRkp15*Rz[k+1]*Rz[k+1] - muoRkp13
+            dVxp_dRx[k,k] = 0.5*dt*(3*muoRk5*Rx[k]*Rx[k] + muoRk3)
+            dVxp_dRy[k,k] = 0.5*dt*(3*muoRk5*Rx[k]*Ry[k])
+            dVxp_dRz[k,k] = 0.5*dt*(3*muoRk5*Rx[k]*Rz[k])
+            dVyp_dRx[k,k] = 0.5*dt*(3*muoRk5*Ry[k]*Rx[k])
+            dVyp_dRy[k,k] = 0.5*dt*(3*muoRk5*Ry[k]*Ry[k] + muoRk3)
+            dVyp_dRz[k,k] = 0.5*dt*(3*muoRk5*Ry[k]*Rz[k])
+            dVzp_dRx[k,k] = 0.5*dt*(3*muoRk5*Rz[k]*Rx[k])
+            dVzp_dRy[k,k] = 0.5*dt*(3*muoRk5*Rz[k]*Ry[k])
+            dVzp_dRz[k,k] = 0.5*dt*(3*muoRk5*Rz[k]*Rz[k] + muoRk3)
+            muoRkp15 = mu/Rkp1**5.0
+            muoRkp13 = mu/Rkp1**3.0
+            dVxp_dRx[k,k+1] = 0.5*dt*(3*muoRkp15*Rx[k+1]*Rx[k+1] + muoRkp13)
+            dVxp_dRy[k,k+1] = 0.5*dt*(3*muoRkp15*Rx[k+1]*Ry[k+1])
+            dVxp_dRz[k,k+1] = 0.5*dt*(3*muoRkp15*Rx[k+1]*Rz[k+1])
+            dVyp_dRx[k,k+1] = 0.5*dt*(3*muoRkp15*Ry[k+1]*Rx[k+1])
+            dVyp_dRy[k,k+1] = 0.5*dt*(3*muoRkp15*Ry[k+1]*Ry[k+1] + muoRkp13)
+            dVyp_dRz[k,k+1] = 0.5*dt*(3*muoRkp15*Ry[k+1]*Rz[k+1])
+            dVzp_dRx[k,k+1] = 0.5*dt*(3*muoRkp15*Rz[k+1]*Rx[k+1])
+            dVzp_dRy[k,k+1] = 0.5*dt*(3*muoRkp15*Rz[k+1]*Ry[k+1])
+            dVzp_dRz[k,k+1] = 0.5*dt*(3*muoRkp15*Rz[k+1]*Rz[k+1] + muoRkp13)
         
         grad[(14+3*(n-1)):(14+4*(n-1)),(0*n):(1*n)] = dVxp_dRx
         grad[(14+3*(n-1)):(14+4*(n-1)),(1*n):(2*n)] = dVxp_dRy

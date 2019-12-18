@@ -91,13 +91,9 @@ Expanded to multi-phase form:
 J_{mf_{tot}} = \sum_{i=1}^{P} \kappa_i \int_{0}^{T_i} \eta(\tau)_i d\tau
 \end{equation}
 \paragraph{}
-The terms $\kappa_i$ allow for a heavier weighting on propellant usage of a specific stage. In the special case of a two-phase descent where the main objective is only final mass to surface of the descent stage, with a constraint on the maximum allowable propellant usage of the previous stage $mp_{max}$, the cost function would simply become:
+The terms $\kappa_i$ allow for a heavier weighting on propellant usage of a specific stage. In the special case of a two-phase descent where the main objective is only final mass to surface of the descent stage, the cost function would simply become:
 \begin{equation}
 J_{mf_{tot}} = \int_{0}^{T_P} \eta(\tau)_P d\tau
-\end{equation}
-subject to the constraint:
-\begin{equation}
-\int_{0}^{T_{P-1}} \frac{T_{m_{P-1}} \eta(\tau)_{P-1}}{g_0 I_{sp_{P-1}}} \leq mp_{max}
 \end{equation}
 \paragraph{}
 The total fuel propellant usage allowed in stage $P-1$ can be a function of other state parameters, in turn effecting how much allowable fuel can be expended before phase switching must occur. I.e.,
