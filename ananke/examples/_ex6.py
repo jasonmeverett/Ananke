@@ -833,7 +833,7 @@ def run_problem6(config_file):
             for kk in range(0,ns[ii]):
                 X = ColX(r,v,m)
                 u = -v/norm(v)
-                U = ColU(u,0.0)
+                U = ColU(u,0.5)
                 cp = ColPt(X,U)
                 ColPts.append(cp)
                 rp = r
