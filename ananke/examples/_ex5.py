@@ -23,6 +23,7 @@ from numba.extending import overload
 from mpl_toolkits.mplot3d import Axes3D
 import time
 import json
+from itertools import chain
 
 class prob_3D_lander_multiphase(object):
     
@@ -556,20 +557,20 @@ class prob_3D_lander_multiphase(object):
             i0y = i0y + ns[ii]
             i0x = i0x + ns[ii]
             
-        # Time constraints
+        # True anomaly constraints
         i0y = 7+P+6+3*(P-1)+3*(P-1)+3*(nt-P)+3*(nt-P)+(nt-P)+nt+P+2*nt
+        i0x = 0
+        grad[i0y,11*nt] = -1.0
+        grad[i0y+1,11*nt] = 1.0
+            
+        # Time constraints
+        i0y = 7+P+6+3*(P-1)+3*(P-1)+3*(nt-P)+3*(nt-P)+(nt-P)+nt+P+2*nt+2
         i0x = 0
         for ii in range(0,P):
             grad[i0y,i0x+11*nt+1] = -1.0
             grad[i0y+P,i0x+11*nt+1] = 1.0
             i0y = i0y + 1
             i0x = i0x + 1
-            
-        # True anomaly constraints
-        i0y = 7+P+6+3*(P-1)+3*(P-1)+3*(nt-P)+3*(nt-P)+(nt-P)+nt+P+2*nt+2*P
-        i0x = 0
-        grad[i0y,11*nt] = -1.0
-        grad[i0y+1,11*nt] = 1.0
 
         grad_rtn = grad.reshape((arr_shape[0]*arr_shape[1],))
         # t2g = time.clock()
@@ -809,10 +810,7 @@ class prob_3D_lander_multiphase(object):
             T_lb_con = T_lb_con + [T_lbs[ii] - tofs[ii]]
             T_ub_con = T_ub_con + [tofs[ii] - T_ubs[ii]]
             idx0 = idx0 + ns[ii]
-        CONSTR_INEQ = CONSTR_INEQ + eta_lb_con + eta_ub_con + T_lb_con + T_ub_con
-        
-        # Nu constraints
-        CONSTR_INEQ = CONSTR_INEQ + [nu_lb - nu] + [nu - nu_ub]
+        CONSTR_INEQ = CONSTR_INEQ + eta_lb_con + eta_ub_con + [nu_lb - nu] + [nu - nu_ub] + T_lb_con + T_ub_con
         
         # Summarize output
         if write_sum == True:
@@ -950,54 +948,97 @@ def run_problem5(config_file):
         # Load in the file state vector
         Xdata_in = json.load(open(opt_in['in_file']))
         file_npts = Xdata_in['npts']
-        X0 = Xdata_in['X0']
+        ns = file_npts
+        P = len(file_npts)
+        x = Xdata_in['X0']
         
-        # # Other important information
-        # npts = opt_config['npts']
+        # Other important information
+        npts = opt_config['npts']
 
-        # # Extract state information
-        # npt = sum(file_npts)
-        # P = len(file_npts)
-        # Rx      = X0[(0*npt)  :(1*npt)  ]
-        # Ry      = X0[(1*npt)  :(2*npt)  ]
-        # Rz      = X0[(2*npt)  :(3*npt)  ]
-        # Vx      = X0[(3*npt)  :(4*npt)  ]
-        # Vy      = X0[(4*npt)  :(5*npt)  ]
-        # Vz      = X0[(5*npt)  :(6*npt)  ]
-        # Ux      = X0[(6*npt)  :(7*npt)  ]
-        # Uy      = X0[(7*npt)  :(8*npt)  ]
-        # Uz      = X0[(8*npt)  :(9*npt)  ]
-        # m       = X0[(9*npt)  :(10*npt) ]
-        # Eta     = X0[(10*npt) :(11*npt) ]
-        # nu      = X0[11*npt]
-        # tofs    = X0[(11*npt+1):(11*npt + 1 + P)]
-        
-        # # Sorrt through all phases
-        # idx0 = 0
-        
-        # for pp in range(0,len(file_npts)):
-            
-        #     # If number of points in phase does not line up:
-        #     if not (file_npts[pp] == npts[pp]):
-                
-        #         # Go through all decision vectors that matter (there are 11)
-        #         for kk in range(0,11):
-        #             ii0 = idx0
-        #             iif = idx0 + file_npts[pp]
-        #             data_new = recast_pts(X0[ii0:iif],npts[pp])
-        #             Rxnew = Rx
-                
-        #         print("MISMATCH ", npts[ii], "  -  ",file_npts[ii])
-            
-        #     # Put index at start of next phase
-        #     idx0 = idx0 + file_npts[pp]
+        Rx = []
+        Ry = []
+        Rz = []
+        Vx = []
+        Vy = []
+        Vz = []
+        Ux = []
+        Uy = []
+        Uz = []
+        m = []
+        Eta = []
+        nu = 0.0
+        T = []
 
-        # if not (file_npts == npts):
-        #     X0new = []
-        #     for ii in range(0,11):
-        #         X0new = X0new + recast_pts(X0[ii*file_npts:(ii+1)*file_npts],npts) 
-        #     X0 = X0new + [X0[-2]] + [X0[-1]]
-    
+        # Split up the state vector into a more meaningful shape
+        i0 = 0
+        for ii in range(0,P):
+            Rx = Rx + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Ry = Ry + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Rz = Rz + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Vx = Vx + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Vy = Vy + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Vz = Vz + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Ux = Ux + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Uy = Uy + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Uz = Uz + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            m  = m  + [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        for ii in range(0,P):
+            Eta= Eta+ [ list ( x[ (i0):(i0+ns[ii]) ] ) ]
+            i0 = i0 + ns[ii]
+        nu = [x[i0]]
+        i0 = i0 + 1
+        T = x[(i0):(i0 + P)]
+
+        for pp in range(0,len(file_npts)):
+            
+            # If number of points in phase does not line up:
+            if not (file_npts[pp] == npts[pp]):
+                
+                Rx[pp] = recast_pts(Rx[pp],npts[pp])
+                Ry[pp] = recast_pts(Ry[pp],npts[pp])
+                Rz[pp] = recast_pts(Rz[pp],npts[pp])
+                Vx[pp] = recast_pts(Vx[pp],npts[pp])
+                Vy[pp] = recast_pts(Vy[pp],npts[pp])
+                Vz[pp] = recast_pts(Vz[pp],npts[pp])
+                Ux[pp] = recast_pts(Ux[pp],npts[pp])
+                Uy[pp] = recast_pts(Uy[pp],npts[pp])
+                Uz[pp] = recast_pts(Uz[pp],npts[pp])
+                m[pp] = recast_pts(m[pp],npts[pp])
+                Eta[pp] = recast_pts(Eta[pp],npts[pp])
+        
+        Rx = list(chain.from_iterable(Rx))
+        Ry = list(chain.from_iterable(Ry))
+        Rz = list(chain.from_iterable(Rz))
+        Vx = list(chain.from_iterable(Vx))
+        Vy = list(chain.from_iterable(Vy))
+        Vz = list(chain.from_iterable(Vz))
+        Ux = list(chain.from_iterable(Ux))
+        Uy = list(chain.from_iterable(Uy))
+        Uz = list(chain.from_iterable(Uz))
+        m  = list(chain.from_iterable(m))
+        Eta= list(chain.from_iterable(Eta))
+        
+        X0 = Rx + Ry + Rz + Vx + Vy + Vz + Ux + Uy + Uz + m + Eta + nu + T
+        
     # Initial guess - linear profile
     elif opt_in['use_linear_guess']:
         print('CONSTRUCTING LINEAR INITIAL GUESS')

@@ -64,17 +64,17 @@
     },
     "opt":
     {    
-        "evolve": true,
+        "evolve": false,
         "objtype": "control",
         "config":
         {
-            "npts": [5,5,15],
+            "npts": [8,8,25],
             "nlopt_alg": "slsqp",
             "verbosity": 20,
             "c_tol": 0.01,
             "xtol_rel": 0.0,
             "ftol_rel": 0.0,
-            "maxeval": 3000,
+            "maxeval": 1000,
             "use_mbh_wrapper": false,
             "mbh":
             {
@@ -84,18 +84,10 @@
         },
         "input":
         {
+            "use_coast_guess": false,
+            "coast_times":[50.0, 60.0, 600.0],
             "guess_from_file": true,
-            "in_file": "Xout.json",
-            "use_linear_guess": true,
-            "linear_guess":
-            {
-                "tof": [40.0,50.0,600.0],
-                "nu0": -15.0,
-                "mfrac_0": 1.0,
-                "mfrac_f": 0.6,
-                "eta_0": 0.8,
-                "eta_f": 0.4
-            }
+            "in_file": "Xout.json"
         },
         "bounds":
         {

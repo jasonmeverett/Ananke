@@ -5,3 +5,4 @@ from ._ex2 import run_problem2
 from ._ex3 import run_problem3
 from ._ex4 import run_problem4
 from ._ex5 import run_problem5
+from ._ex6 import run_problem6

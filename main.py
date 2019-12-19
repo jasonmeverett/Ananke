@@ -9,5 +9,5 @@ Created on Mon Dec  9 20:38:41 2019
 from ananke.examples import *
 import json
 
-run_problem5('inputfiles/config_ex5.json')
+run_problem6('inputfiles/config_ex6.json')
 # run_problem3('inputfiles/config_ex3.json')

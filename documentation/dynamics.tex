@@ -87,20 +87,12 @@ The second objective function represents the minimum fuel problem, expressed as:
 J_{mf} = \int_{0}^{T} \eta(\tau) d\tau
 \end{equation}
 Expanded to multi-phase form:
-\begin{equation}
+\begin{equation} \label{eq:mp_obj_fuel}
 J_{mf_{tot}} = \sum_{i=1}^{P} \kappa_i \int_{0}^{T_i} \eta(\tau)_i d\tau
 \end{equation}
 \paragraph{}
-The terms $\kappa_i$ allow for a heavier weighting on propellant usage of a specific stage. In the special case of a two-phase descent where the main objective is only final mass to surface of the descent stage, the cost function would simply become:
-\begin{equation}
-J_{mf_{tot}} = \int_{0}^{T_P} \eta(\tau)_P d\tau
-\end{equation}
-\paragraph{}
-The total fuel propellant usage allowed in stage $P-1$ can be a function of other state parameters, in turn effecting how much allowable fuel can be expended before phase switching must occur. I.e.,
-\begin{equation}
-mp_{max} = f(\vec{r}(t), \vec{v}(t), t, ... )
-\end{equation}
-This modification to the problem will effect the derivation of the nonlinear partials for the constraint, and is not discussed in this document, but can easily be derived.
+The terms $\kappa_i$ allow for a heavier weighting on propellant usage of a specific stage. In the special case of a two-phase descent where the main objective is only final mass to surface of the descent stage, the objective function would take the form of equation \ref{eq:mp_obj_fuel} with only $\kappa_P = 1$.
+
 
 
 
