@@ -80,8 +80,8 @@ class prob_3D_lander(object):
     # TODO: Set these bounds in a smarter fashion.
     def get_bounds(self):
         
-        sf_r = 1.0
-        sf_v = 2.0
+        sf_r = 3.0
+        sf_v = 3.0
         rx_lb = [self.r0_I[0] - sf_r*norm(self.r0_I)] * self.npts
         ry_lb = [self.r0_I[1] - sf_r*norm(self.r0_I)] * self.npts
         rz_lb = [self.r0_I[2] - sf_r*norm(self.r0_I)] * self.npts
@@ -99,8 +99,8 @@ class prob_3D_lander(object):
         Eta_lb = [-0.5]*self.npts
         Eta_ub = [1.5]*self.npts
         T_lb = [10]
-        T_ub = [1000]
-        nu_lb = [-15.0]
+        T_ub = [1200]
+        nu_lb = [-30.0]
         nu_ub = [15.0]
         
         LB = r_lb + v_lb + u_lb + m_lb + Eta_lb + T_lb + nu_lb

@@ -93,7 +93,7 @@ class prob_3D_lander_multiphase(object):
     # TODO: Set these bounds in a smarter fashion.
     def get_bounds(self):
         
-        sf_r = 1.0
+        sf_r = 2.0
         sf_v = 3.0
         rx_lb = [self.r0_I[0] - sf_r*norm(self.r0_I)] * sum(self.npts)
         ry_lb = [self.r0_I[1] - sf_r*norm(self.r0_I)] * sum(self.npts)
@@ -107,12 +107,12 @@ class prob_3D_lander_multiphase(object):
         v_ub = [ sf_v*norm(self.v0_I)]*3*sum(self.npts)
         u_lb = [-2]*3*sum(self.npts)
         u_ub = [ 2]*3*sum(self.npts)
-        m_lb = [0.1]*sum(self.npts)
-        m_ub = [1.1*self.mass0]*sum(self.npts)
+        m_lb = [0.01]*sum(self.npts)
+        m_ub = [1.7*self.mass0]*sum(self.npts)
         Eta_lb = [-0.1]*sum(self.npts)
         Eta_ub = [1.1]*sum(self.npts)
         T_lb = [1]*self.nphases
-        T_ub = [1000]*self.nphases
+        T_ub = [10000]*self.nphases
         nu_lb = [-30.0]
         nu_ub = [30.0]
         LB = r_lb + v_lb + u_lb + m_lb + Eta_lb + nu_lb + T_lb
@@ -820,7 +820,7 @@ class prob_3D_lander_multiphase(object):
             print("    TOF 3:       %10.3f sec"%(tofs[2]))
             print("       nu:       %10.3f deg"%(nu))
             print("Final Mass:      %10.3f kg"%(m[-1]))
-            print("    Mf ST1:      %10.3f kg"%(m[ns[0]-1] - 8000 - 1000 - 5500))
+            print("    Mf ST1:      %10.3f kg"%(m[ns[0]-1] - 8000 - 2000 - 2000))
         
         alt = array([norm([Rx[k], Ry[k], Rz[k]]) - self.R_eq for k in range(0,npt) ])
         if write_csv == True:

@@ -18,8 +18,8 @@
             "altp": 15000.0,
             "inc": 0.0,
             "raan": 0.0,
-            "argper": -12.0,
-            "ta": -5.0,
+            "argper": -0.0,
+            "ta": -18.0,
             "degrees":true
         }
     },
@@ -48,14 +48,14 @@
         "objtype": "control",
         "config":
         {
-            "npts": 20,
+            "npts": 15,
             "nlopt_alg": "slsqp",
             "verbosity": 20,
             "c_tol": 0.01,
             "xtol_rel": 0.0,
             "ftol_rel": 0.0,
             "maxeval": 2000,
-            "use_mbh_wrapper": true,
+            "use_mbh_wrapper": false,
             "mbh":
             {
                 "stop": 2,
@@ -70,7 +70,7 @@
             "linear_guess":
             {
                 "tof": 780.0,
-                "nu0": -5.0,
+                "nu0": -18.0,
                 "mfrac_0": 1.0,
                 "mfrac_f": 0.6,
                 "eta_0": 1.0,
@@ -81,15 +81,15 @@
         {
             "lo":
             {
-                "T": 300.0,
+                "T": 100.0,
                 "eta": 0.2,
-                "nu0": -5.0
+                "nu0": -18.0
             },
             "hi":
             {
-                "T": 900.0,
+                "T": 1200.0,
                 "eta": 0.8,
-                "nu0": -5.0
+                "nu0": -18.0
             }
         },
         "output":

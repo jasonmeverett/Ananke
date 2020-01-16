@@ -15,32 +15,26 @@
             "inc": 0.0,
             "raan": 0.0,
             "argper": 0.0,
-            "ta": -17.9589,
+            "ta": -18.0,
             "degrees":true
         },
         "stages": 
         [
             {
-                "ms": 14000.0,
-                "mp": 4000.0
-            },
-            {
-                "ms": 15000.0,
-                "mp": 8000.0
+                "ms": 0.0,
+                "mp": 20000.0
             }
         ],
         "engines":
         [
             {
-                "Tmax": 100000.0,
+                "Tmax": 66000.0,
                 "isp": 450.0
             }
         ],
         "phases":
         [
-            [[0,1],0],
-            [[0,1],0],
-            [[  1],0]
+            [[0],0]
         ]
     },
     "target":
@@ -65,27 +59,27 @@
     "opt":
     {    
         "evolve": true,
-        "objtype": "fuel",
+        "objtype": "control",
         "config":
         {
-            "npts": [10,5,10],
+            "npts": [20],
             "nlopt_alg": "slsqp",
-            "verbosity": 20,
+            "verbosity": 10,
             "c_tol": 0.01,
             "xtol_rel": 0.0,
             "ftol_rel": 0.0,
-            "maxeval": 1000,
+            "maxeval": 2000,
             "use_mbh_wrapper": false,
             "mbh":
             {
-                "stop": 1,
-                "perturb": 0.005
+                "stop": 2,
+                "perturb": 0.01
             }
         },
         "input":
         {
-            "use_coast_guess": false,
-            "coast_times":[500.0, 100.0, 300.0],
+            "use_coast_guess": true,
+            "coast_times":[50.0, 60.0, 600.0],
             "guess_from_file": true,
             "in_file": "Xout.json"
         },
@@ -93,15 +87,15 @@
         {
             "lo":
             {
-                "T": [50.0, 80.0, 50.0],
-                "eta": [0.2, 0.0, 0.2],
-                "nu0": -17.9589
+                "T": [10.0],
+                "eta": [0.2],
+                "nu0": -18.0
             },
             "hi":
             {
-                "T": [1500.0, 80.0, 1500.0],
-                "eta": [0.9, 0.0, 0.9],
-                "nu0": -17.9589
+                "T": [1000.0],
+                "eta": [0.8],
+                "nu0": -18.0
             }
         },
         "output":

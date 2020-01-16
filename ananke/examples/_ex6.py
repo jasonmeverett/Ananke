@@ -10,7 +10,6 @@ This should match optimality!!!!
 """
 
 from numpy import *
-import pykep as pk
 import matplotlib.pyplot as plt
 import pygmo as pg
 from scipy.linalg import norm
@@ -18,14 +17,13 @@ from ananke.orbit import *
 from ananke.frames import *
 from ananke.util import *
 from ananke.planets import *
-from numba import jit, jitclass
-from numba.extending import overload
 from mpl_toolkits.mplot3d import Axes3D
 import time
 import json
 from itertools import chain
 from typing import List
 from copy import deepcopy
+import AnankeC as ac
 
 class ColX():
     def __init__(self,R=zeros(3),V=zeros(3),m=0.0):
@@ -83,7 +81,7 @@ class TrajLeg():
         return os
 
 class OptTraj():
-    def __init__(self,TrajLegs : List[TrajLeg] = [], nu0 = 0.0):
+    def __init__(self,TrajLegs = [], nu0 = 0.0):
         self.TrajLegs = TrajLegs
         self.nu0 = nu0
     def __str__(self):
@@ -96,7 +94,7 @@ class OptTraj():
             os = os + ",\n"
         os = os[0:-2] + "\n" + "]\n}\n"
         return os
-    
+
 def ConstructDV(OT : OptTraj):
     X = []
     for TrajLeg in OT.TrajLegs:
@@ -168,7 +166,7 @@ def f(X, U, mu=4902799000000.0, Tm=66000.0, isp=450.0):
     Xdot[6] = -Tm*U[3]/(g0*isp)
     return Xdot
 
-# Partial of Xdot wrt. X
+# Partial of f wrt. X
 def dfdX(X, U, mu=4902799000000.0, Tm=66000.0, isp=450.0):
     
     Rk = X[0:3]
@@ -185,7 +183,7 @@ def dfdX(X, U, mu=4902799000000.0, Tm=66000.0, isp=450.0):
 
     return A
 
-# Partial of Xdot wrt. U
+# Partial of f wrt. U
 def dfdU(X, U, mu=4902799000000.0, Tm=66000.0, isp=450.0):
     
     m = X[6]
@@ -201,9 +199,62 @@ def dfdU(X, U, mu=4902799000000.0, Tm=66000.0, isp=450.0):
     
     return A
     
+# ----------------------------
+# Initial boundary constraints
+# ----------------------------
+   
+# Returns a 7x1 vector
+def g0_1(OT : OptTraj, C : dict):
     
+    # Vehicle definition
+    CV = C['vehicle']
+    CP = C['planet']
     
+    ra = CP['R_eq'] + CV['orbit']['alta']
+    rp = CP['R_eq'] + CV['orbit']['altp']
+    sma = 0.5*(ra+rp)
+    ecc = (ra-rp)/(ra+rp)
+    inc = CV['orbit']['inc']
+    Om = CV['orbit']['raan']
+    om = CV['orbit']['argper']
+    
+    # Initial true anomaly
+    nu = OT.nu0
+    
+    # Initial State equality constraint
+    r0_I,v0_I = elts_to_rv(sma, ecc, inc, Om, om, nu, CP['mu'], CV['orbit']['degrees'])
+    
+    # Calculate constraint performances.
+    RVcon = list(OT.TrajLegs[0].ColPts[0].X.R - r0_I) + list(OT.TrajLegs[0].ColPts[0].X.V - v0_I)
+    mcon = OT.TrajLegs[0].ColPts[0].X.m - sum([CV['stages'][k]['ms'] + CV['stages'][k]['mp'] for k in CV['phases'][0][0]])
+    
+    # Return R,V,m constraint information
+    Xcon  = RVcon + [mcon]
+    return Xcon
 
+def g0_2(OT : OptTraj, C : dict):
+    return None
+
+def g0_3(OT : OptTraj, C : dict):
+    return None
+
+# ----------------------------
+# Final boundary constraints
+# ----------------------------
+
+def gf_1(OT : OptTraj, C : dict):
+    return None
+
+def gf_2(OT : OptTraj, C : dict):
+    return None
+
+def gf_3(OT : OptTraj, C : dict):
+    return None
+    
+# -----------------------------
+# Boundary constraint functions
+# -----------------------------
+   
 ##############################################################################
 ##############################################################################
 ##############################################################################
@@ -287,14 +338,14 @@ class prob_MPlander(object):
         mmin = 0.0
         Umin = -su*array([1.0, 1.0, 1.0])
         Etamin = -se*1.0
-        LB = (list(Rmin) + list(Vmin) + [mmin] + list(Umin) + [Etamin])*nt + [-30] + [0]*P 
+        LB = (list(Rmin) + list(Vmin) + [mmin] + list(Umin) + [Etamin])*nt + [-60] + [0]*P 
 
         Rmax = sr*array([self.R_eq, self.R_eq, self.R_eq])
         Vmax = sv*array([sqrt(self.mu/self.R_eq), sqrt(self.mu/self.R_eq), sqrt(self.mu/self.R_eq)])
         mmax = self.mass0
         Umax = su*array([1.0, 1.0, 1.0])
         Etamax = se*1.0
-        UB = (list(Rmax) + list(Vmax) + [mmax] + list(Umax) + [Etamax])*nt + [30] + [1000]*P 
+        UB = (list(Rmax) + list(Vmax) + [mmax] + list(Umax) + [Etamax])*nt + [30] + [10000]*P 
 
         return (LB, UB)
     
@@ -345,6 +396,10 @@ class prob_MPlander(object):
         i0y = 0
         i0t = 11*nt+1
         if self.objtype == 'control':
+            # i0x = i0x + 11*ns[0]
+            # i0x = i0x + 11*ns[1]
+            # i0t = i0t + 1
+            # i0t = i0t + 1
             for ii in range(0,P):
                 tl = OT.TrajLegs[ii]
                 dt = tl.T/ns[ii]
@@ -361,7 +416,30 @@ class prob_MPlander(object):
                 grad[0,i0t] = J/tl.T
                 i0x = i0x + 11*ns[ii]
                 i0t = i0t + 1
-
+                
+        if self.objtype == 'fuel':
+            i0x = i0x + 11*ns[0]
+            i0x = i0x + 11*ns[1]
+            i0t = i0t + 1
+            i0t = i0t + 1
+            for ii in range(P-1,P):
+                tl = OT.TrajLegs[ii]
+                dt = tl.T/ns[ii]
+                J = sum([0.5*dt*(tl.ColPts[k].U.eta + tl.ColPts[k+1].U.eta) for k in range(0, ns[ii]-1)])
+                dJ_dT = J/tl.T
+                dJ_dEta = 0.5*dt*ones(ns[ii])
+                dJ_dEta[1:-1] = [2*a for a in dJ_dEta[1:-1]]
+                for k in range(0,ns[ii]):
+                    grad[0,(i0x+10+11*k)] = dJ_dEta[k]
+                grad[0,i0t] = J/tl.T
+                i0x = i0x + 11*ns[ii]
+                i0t = i0t + 1
+                
+        # print(norm(grad[0,:]-arre[0,:]))
+        # print(grad[0,:])
+        # print(arre[0,:])
+        # quit()
+                
         # Initial state constraint (with mass!)
         i0y = 1
         grad[i0y:(i0y+7),0:7] = eye(7)
@@ -583,13 +661,23 @@ class prob_MPlander(object):
         # Cost function
         J = 0
         if self.objtype == 'control':
-            for ii,tl in enumerate(OT.TrajLegs):
+            for ii in range(0,P):
+                tl = OT.TrajLegs[ii]
                 Tm = self.Tmaxs[self.phases[ii][1]]
                 dt = tl.T/ns[ii]
                 for k in range(0, len(tl.ColPts)-1):
                     cp = tl.ColPts[k]
                     cp1 = tl.ColPts[k+1]
                     J = J + 0.5*dt*((Tm*cp.U.eta/cp.X.m)**2.0 + (Tm*cp1.U.eta/cp1.X.m)**2.0) 
+                    
+        if self.objtype == 'fuel':
+            for ii in range(P-1,P):
+                tl = OT.TrajLegs[ii]
+                dt = tl.T/ns[ii]
+                for k in range(0, len(tl.ColPts)-1):
+                    cp = tl.ColPts[k]
+                    cp1 = tl.ColPts[k+1]
+                    J = J + 0.5*dt*(cp.U.eta + cp1.U.eta) 
         
         # Set objective value
         OBJVAL = [J]
@@ -608,6 +696,8 @@ class prob_MPlander(object):
         # Starting state constraints
         CONSTR_EQ = CONSTR_EQ + list(OT.TrajLegs[0].ColPts[0].X.R - r0_I)
         CONSTR_EQ = CONSTR_EQ + list(OT.TrajLegs[0].ColPts[0].X.V - v0_I)
+        
+        
         
         # Mass constraints. For starts of stages, ensure mass aligns directly
         # with the total mass. Otherwise, match mass of previous stage's mass.
@@ -693,7 +783,7 @@ class prob_MPlander(object):
             for ii in range(0,P):
                 print("    TOF %d:       %10.3f sec"%(ii+1,OT.TrajLegs[ii].T))
             print("Final Mass:      %10.3f kg"%(OT.TrajLegs[-1].ColPts[-1].X.m))
-            print("Final st1 mass:  %10.3f kg"%(OT.TrajLegs[0].ColPts[-1].X.m - 5500 - 1000 - 8000))
+            print("Final st1 mass:  %10.3f kg"%(OT.TrajLegs[0].ColPts[-1].X.m - 14000 - 15000 - 8000))
             print("J %.5f"%(J))
             
         # Write to CSV file
@@ -833,15 +923,15 @@ def run_problem6(config_file):
             for kk in range(0,ns[ii]):
                 X = ColX(r,v,m)
                 u = -v/norm(v)
-                U = ColU(u,0.5)
+                U = ColU(u,0.7)
                 cp = ColPt(X,U)
                 ColPts.append(cp)
                 rp = r
                 vp = v
                 mp = m
                 r = r + v*dt
-                v = v + (-mu/norm(r)**3.0*r + tmax*0.5/m*u)*dt
-                m = m - tmax*0.5/(9.81*isp)
+                v = v + (-mu/norm(r)**3.0*r + tmax*0.7/m*u)*dt
+                m = m - tmax*0.8/(9.81*isp)
                 t = t + dt
             TrajLegs.append(TrajLeg(ColPts,t))
         OT = OptTraj(TrajLegs, nu0=nu0)
