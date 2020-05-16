@@ -65,10 +65,10 @@
     "opt":
     {    
         "evolve": true,
-        "objtype": "fuel",
+        "objtype": "control",
         "config":
         {
-            "npts": [10,5,10],
+            "npts": [5,5,15],
             "nlopt_alg": "slsqp",
             "verbosity": 20,
             "c_tol": 0.01,

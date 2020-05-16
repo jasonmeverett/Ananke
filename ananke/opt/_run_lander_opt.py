@@ -23,7 +23,12 @@ import json
 from itertools import chain
 from typing import List
 from copy import deepcopy
-import AnankeC as ac
+
+##############################################################################
+##############################################################################
+##############################################################################
+# Collocation Point configuration
+
 
 class ColX():
     def __init__(self,R=zeros(3),V=zeros(3),m=0.0):
@@ -57,6 +62,8 @@ class ColPt():
     def __init__(self,X=ColX(),U=ColU()):
         self.X = X
         self.U = U
+    def to_array(self):
+        return array( list(self.X.to_array()) + list(self.U.to_array()) )
     def __str__(self):
         os = "{\n"
         os = os + "\t\"X\":\n"
@@ -145,7 +152,7 @@ def OptTrajFromJson(OTd):
             tl.ColPts.append(cp)
         OT.TrajLegs.append(tl)
     return OT
-
+    
 ##############################################################################
 ##############################################################################
 ##############################################################################
@@ -629,24 +636,26 @@ class prob_MPlander(object):
         grad_rtn = grad.reshape((arr_shape[0]*arr_shape[1],))
         return grad_rtn
 
+    # ---------------------------------
+    # Main trajectory fitness function.
+    # ---------------------------------
     def run_traj(self, x, plot_traj=0, write_sum=0, write_csv=0):
-        P = self.nphases
-        npcs = sum([n-1 for n in self.npts])
-        npt = sum(self.npts)
-        ns = self.npts
-        mu = self.mu
-        g0 = self.g0
+        P       = self.nphases
+        npcs    = sum([n-1 for n in self.npts])
+        npt     = sum(self.npts)
+        ns      = self.npts
+        mu      = self.mu
+        g0      = self.g0
         Eta_lbs = self.Eta_lbs
         Eta_ubs = self.Eta_ubs
-        T_lbs = self.T_lbs
-        T_ubs = self.T_ubs
-        nu_lb = self.nu_lb
-        nu_ub = self.nu_ub
-        
-        CP = self.C['planet']
-        CV = self.C['vehicle']
-        CT = self.C['target']
-        CO = self.C['opt']
+        T_lbs   = self.T_lbs
+        T_ubs   = self.T_ubs
+        nu_lb   = self.nu_lb
+        nu_ub   = self.nu_ub
+        CP      = self.C['planet']
+        CV      = self.C['vehicle']
+        CT      = self.C['target']
+        CO      = self.C['opt']
         
         # Return lists
         OBJVAL = []
@@ -657,6 +666,10 @@ class prob_MPlander(object):
         OT = ConstructOptTraj(x,ns)    
         nu = OT.nu0
         tof_tot = sum([a.T for a in OT.TrajLegs])
+    
+        # Convert into 2D array objects to avoid for loops later.    
+        X = [ [ list(cp.to_array()) for cp in tl.ColPts ] for tl in OT.TrajLegs ]
+        X = [ array(y) for y in X ] 
         
         # Cost function
         J = 0
@@ -664,7 +677,7 @@ class prob_MPlander(object):
             for ii in range(0,P):
                 tl = OT.TrajLegs[ii]
                 Tm = self.Tmaxs[self.phases[ii][1]]
-                dt = tl.T/ns[ii]
+                dt = tl.T/ns[ii]                
                 for k in range(0, len(tl.ColPts)-1):
                     cp = tl.ColPts[k]
                     cp1 = tl.ColPts[k+1]
@@ -696,8 +709,6 @@ class prob_MPlander(object):
         # Starting state constraints
         CONSTR_EQ = CONSTR_EQ + list(OT.TrajLegs[0].ColPts[0].X.R - r0_I)
         CONSTR_EQ = CONSTR_EQ + list(OT.TrajLegs[0].ColPts[0].X.V - v0_I)
-        
-        
         
         # Mass constraints. For starts of stages, ensure mass aligns directly
         # with the total mass. Otherwise, match mass of previous stage's mass.
@@ -854,7 +865,7 @@ class prob_MPlander(object):
         # return [0] + [0]*self.get_nec() + [0]*self.get_nic()
 
 # TODO: Add omega x r terms for rotating planet
-def run_problem6(config_file):
+def run_lander_opt(config_file):
     """
     Solves the minimum control problem of a 2-D lander under a 
     uniform gravity field. Employs a trapezoidal collocation method
@@ -937,9 +948,9 @@ def run_problem6(config_file):
         OT = OptTraj(TrajLegs, nu0=nu0)
         X0 = ConstructDV(OT)
     elif opt_in['guess_from_file']:
-        OTin = OptTrajFromJson(json.load(open(opt_in['in_file'])))
-        X0 = ConstructDV(OTin)
-        
+        OT = OptTrajFromJson(json.load(open(opt_in['in_file'])))
+        X0 = ConstructDV(OT)
+    
     # Create a population
     print("Creating population...")
     pop = pg.population(prob)

@@ -116,7 +116,7 @@ def run_problem1():
     """    
     
     # Problem definition
-    udp1 = prob_1D_helloCollocation(20,1.0)
+    udp1 = prob_1D_helloCollocation(100,1.0)
     prob = pg.problem(udp1)
     prob.c_tol = 1e-5
 
