@@ -31,7 +31,7 @@ import json
 mu = 4902799000000.0
 R_eq = 1738000.0
 Omega = 0.0000026616665
-Tmax = 100000.0
+Tmax = 60000.0
 isp = 450.0
 etaLB = 0.2
 etaUB = 0.9
@@ -46,7 +46,7 @@ sma = 0.5*(ra+rp)
 ecc = (ra-rp)/(ra+rp)
 inc = 0.0
 raan = 0.0
-argper = -20.0
+argper = -30.0
 ta = 0.0
 r0_I,v0_I = elts_to_rv(sma,ecc,inc,raan,argper,ta,mu,degrees=True)
 
@@ -78,7 +78,7 @@ bnds_max = 11 * [ 2000000]
 tl1.set_bounds(bnds_min, bnds_max)
 
 # Configure a trajectory leg.
-nn2 = 15
+nn2 = 10
 tl2 = TrajLeg(nn2)
 tl2.set_len_X_U(7, 4)
 tl2.set_dynamics(lo.f, lo.dfdX, lo.dfdU, [mu, Tmax, isp])
@@ -106,22 +106,23 @@ algo = pg.algorithm(pg.nlopt('slsqp'))
 algo.set_verbosity(50)
 algo.extract(pg.nlopt).xtol_rel = 0.0
 algo.extract(pg.nlopt).ftol_rel = 0.0
-algo.extract(pg.nlopt).maxeval = 1000
+algo.extract(pg.nlopt).maxeval = 1
 
 # Set up initial guess.
-X0 = [r0_I[0], r0_I[1], r0_I[2], v0_I[0], v0_I[1], v0_I[2], m0, 0.0, -1.0, 0.0, 0.9]
-Xf = [R_eq, 0, 0, 0, 0, 0, 0.5*X0[6], 0.0, -1.0, 0.0, 0.2]
-Xinit = [300]
-for ii in range(0, nn1):
-    pc = 0.5*float(ii)/float(nn1)
-    Xinit = Xinit +  ( np.array(X0) + pc * (np.array(Xf) - np.array(X0)) ).tolist()
-Xinit = Xinit + [500]
-for ii in range(0, nn2):
-    pc = 0.5 + 0.5*float(ii)/float(nn2)
-    Xinit = Xinit +  ( np.array(X0) + pc * (np.array(Xf) - np.array(X0)) ).tolist()
+# X0 = [r0_I[0], r0_I[1], r0_I[2], v0_I[0], v0_I[1], v0_I[2], m0, 0.0, -1.0, 0.0, 0.9]
+# Xf = [R_eq, 0, 0, 0, 0, 0, 0.5*X0[6], 0.0, -1.0, 0.0, 0.2]
+# Xinit = [300]
+# for ii in range(0, nn1):
+#     pc = 0.5*float(ii)/float(nn1)
+#     Xinit = Xinit +  ( np.array(X0) + pc * (np.array(Xf) - np.array(X0)) ).tolist()
+# Xinit = Xinit + [500]
+# for ii in range(0, nn2):
+#     pc = 0.5 + 0.5*float(ii)/float(nn2)
+#     Xinit = Xinit +  ( np.array(X0) + pc * (np.array(Xf) - np.array(X0)) ).tolist()
 
-# Xinit = np.load('champion_x.npy')
-    
+Xinit = np.load('champion_x.npy')
+# Xinit[0] = 230.0
+
 pop = pg.population(prob)
 pop.push_back(Xinit)
 pop = algo.evolve(pop)
@@ -142,9 +143,9 @@ axs[1].grid(which='both')
 axs[1].minorticks_on()
 axs[2].grid(which='both')
 axs[2].minorticks_on()
-axs[0].set_ylabel('Position')
-axs[1].set_ylabel('Velocity')
-axs[2].set_ylabel('Control')
+axs[0].set_ylabel('Mass')
+axs[1].set_ylabel('Altitude')
+axs[2].set_ylabel('Throttle')
 plt.show()
 
 

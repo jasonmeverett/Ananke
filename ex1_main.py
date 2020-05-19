@@ -27,15 +27,15 @@ import json
 ao = Ananke_Config()
 
 # Configure a trajectory leg.
-num_nodes = 50
+num_nodes = 70
 tl1 = TrajLeg(num_nodes)
 tl1.set_len_X_U(2, 1)
 tl1.set_dynamics(ex1.f_1D, ex1.dfdX_1D, ex1.dfdU_1D, [1.0])
 tl1.add_eq(ex1.g1, ex1.dg1, 2, RegionFlags.FRONT)
 tl1.add_eq(ex1.g2, ex1.dg2, 2, RegionFlags.BACK)
 tl1.add_ineq(ex1.g3, ex1.dg3, 1, RegionFlags.PATH, [6.0])
-tl1.set_obj(ex1.Jctrl, ex1.dJctrl, ObjectiveFlags.LAGRANGE, [])
-# tl1.set_obj(ex1.Jfuel, ex1.dJfuel, ObjectiveFlags.LAGRANGE, [])
+# tl1.set_obj(ex1.Jctrl, ex1.dJctrl, ObjectiveFlags.LAGRANGE, [])
+tl1.set_obj(ex1.Jfuel, ex1.dJfuel, ObjectiveFlags.LAGRANGE, [])
 tl1.set_TOF(1.0, 1.0)
 bnds_min = [-100.0, -100.0, -100.0]
 bnds_max = [ 100.0,  100.0,  100.0]
@@ -59,7 +59,6 @@ for ii in range(0, num_nodes):
 
 pop = pg.population(prob)
 pop.push_back(X0)
-algo.set_verbosity(1)
 pop = algo.evolve(pop)
 
 # Grab first leg data.
