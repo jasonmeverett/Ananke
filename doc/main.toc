@@ -1,0 +1,14 @@
+\contentsline {section}{\numberline {1}Content}{3}%
+\contentsline {subsection}{\numberline {1.1}Collocation Overview}{3}%
+\contentsline {subsection}{\numberline {1.2}Path Constraints}{3}%
+\contentsline {subsection}{\numberline {1.3}Boundary Constraints}{3}%
+\contentsline {subsubsection}{\numberline {1.3.1}Initial and Final Trajectory States}{3}%
+\contentsline {paragraph}{}{3}%
+\contentsline {paragraph}{}{4}%
+\contentsline {subsubsection}{\numberline {1.3.2}Phase Boundary Constraints}{4}%
+\contentsline {subsubsection}{\numberline {1.3.3}Other Constraints}{4}%
+\contentsline {subsection}{\numberline {1.4}Gradient}{5}%
+\contentsline {subsubsection}{\numberline {1.4.1}Objective Function - Minimum Control}{6}%
+\contentsline {subsubsection}{\numberline {1.4.2}Initial Position Equality Constraint}{7}%
+\contentsline {subsubsection}{\numberline {1.4.3}Initial Velocity Constraint}{8}%
+\contentsline {subsubsection}{\numberline {1.4.4}Initial Mass Constraints}{8}%

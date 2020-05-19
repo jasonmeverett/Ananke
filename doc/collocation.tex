@@ -1,0 +1,63 @@
+\subsection{Trajectory Leg, Collocation Node}
+\paragraph{}
+One phase represents on trajectory leg. Each trajectory leg is comprised of a set of collocation points (or collocation nodes), and a total length of time for a defined dynamical system to progress through all of the collocation nodes along the leg. 
+\paragraph{}
+Each collocation point consists of a state, $\vec{X}$, and control, $\vec{U}$. At each node $k$ with state $\vec{X}_k$ and control $\vec{U}_k$ along a trajectory leg, the system experiences a dynamical response, $\dot{\vec{X}}_k$:
+\begin{equation}
+\dot{\vec{X}}_k = \vec{f}_k (\vec{X}_k, \vec{U}_k) = \vec{f}_k(\vec{C}_k)
+\end{equation}
+\paragraph{}
+If a collocation point at node $k$ (of $N$ total nodes) is represented by $\vec{C}_k = [\vec{X}_k, \vec{U}_k]$ , a trajectory leg $\vec{L}_i$, as a component of an entire trajectory from leg $i=0 \dots P$, can be represented programmatically as:
+\begin{equation}
+\vec{L}_i = \left\{ T_i, \left[
+\vec{C}_1, \vec{C}_2, \dots, \vec{C}_N
+\right]
+\right\}
+\end{equation}
+\subsection{Trajectory Leg Constraints}
+\subsubsection{Boundary Constraints}
+\paragraph{}
+Boundary constraints are represented at the start of each trajectory leg and at the end of each trajectory leg:
+\begin{align}
+\vec{h}_{0_i} = \vec{h}_{0_i} (\vec{L}_1, \vec{L}_2, \dots, \vec{L}_P) &&
+i \in \{ 1, ... , P \}
+\end{align}
+\begin{align}
+\vec{h}_{f_i} = \vec{h}_{f_i} (\vec{L}_1, \vec{L}_2, \dots, \vec{L}_P) &&
+i \in \{ 1, ... , P \}
+\end{align}
+\subsubsection{Defect Constraints}
+\paragraph{}
+Using a Hermite-Simpson transcription, for a specific trajectory leg $i$, a defect constraint $\vec{\Delta}_{k \rightarrow k+1}$, from collocation node $\vec{C}_k=[\vec{X}_k,\vec{U}_k]$ to $\vec{C}_{k+1} = [\vec{X}_{k+1},\vec{U}_{k+1}]$, with a fixed time delta $h_i$ in between each node, is represented as:
+\begin{equation}
+\vec{\Delta}_{k \rightarrow k+1} = 
+\vec{X}_k - \vec{X}_{k+1} + 
+\frac{h_i}{6}\left[
+f(\vec{C}_k) + 4 f(\vec{C}_c) + f(\vec{C}_{k+1})
+\right]
+\end{equation}
+\begin{equation}
+\vec{C}_c = [\vec{X}_c, \vec{U}_c]
+\end{equation}
+\begin{equation}
+\vec{U}_c = \frac{1}{2}\left(\vec{U}_k + \vec{U}_{k+1}\right)
+\end{equation}
+\begin{equation}
+\vec{X}_c = \frac{1}{2} \left(
+\vec{X}_k + \vec{X}_{k+1}
+\right) + \frac{h_i}{8} \left[
+f(\vec{C}_k) - f(\vec{C}_{k+1})
+\right]
+\end{equation}
+\subsubsection{Path Constraints}
+\paragraph{}
+Path constraints are typically difficult to implement for a collocation-type transcription because of the requirement to interpolate dynamics and check constraints through non-node continuous locations. For that reason, the ability to implement path constraints is as of now available to the user for each collocation node, but the user should be aware that these path constraints are only evaluated at collocation nodes, rather than at each continuous state along a trajectory.
+\paragraph{}
+Path constraints are represented at each collocation node $k$ in a specific trajectory leg as:
+\begin{align}
+\vec{g}_{k} = \vec{g}_k(\vec{X}_k,\vec{U}_k) = \vec{g}_{k} ( \vec{C}_k ) &&
+k \in \{ 1, ... , N \}
+\end{align}
+Because the Hermite-Simpson transcription still represents a linear control interpolation between control $\vec{U}_k$ and $\vec{U}_{k+1}$, it is safe to bound control path, such as limiting a magnitude of a thrust vector direction to unity. For path constraints of state, an example of a well-behaved path constraint would be an altitude constraint on a lunar descent trajectory, where it is known that the most optimal trajectory typically does not involve close dips to low altitudes followed by a return to a higher altitude. The author plans to eventually study state path constraints in more detail.
+
+

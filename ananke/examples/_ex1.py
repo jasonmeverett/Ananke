@@ -76,7 +76,7 @@ class prob_1D_helloCollocation():
             CONSTR_EQ.append( (V[ii+1] - V[ii]) - 0.5*dt*(U[ii+1] + U[ii])  )
         
         # Objective value
-        fac = 2.0
+        fac = 1.0
         OBJVAL = [sum([0.5*dt*norm(U[ii+1]**fac + U[ii]**fac) for ii in range(0, self.npts-1)])]
         
         # Plot trajectory
@@ -116,9 +116,9 @@ def run_problem1():
     """    
     
     # Problem definition
-    udp1 = prob_1D_helloCollocation(100,1.0)
+    udp1 = prob_1D_helloCollocation(30,1.0)
     prob = pg.problem(udp1)
-    prob.c_tol = 1e-5
+    prob.c_tol = 1e-9
 
     # Algorithm definition
     uda = pg.nlopt('slsqp')

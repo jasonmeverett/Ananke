@@ -1,0 +1,113 @@
+{
+    "planet":
+    {
+        "mu": 4902799000000.0,
+        "R_eq": 1738000.0,
+        "Omega": 0.0000026616665,
+        "Epoch": 0.0
+    },
+    "vehicle":
+    {
+        "orbit":
+        {
+            "alta": 100000.0,
+            "altp": 15000.0,
+            "inc": 0.0,
+            "raan": 0.0,
+            "argper": 0.0,
+            "ta": -15.0,
+            "degrees":true
+        },
+        "stages": 
+        [
+            {
+                "ms": 0.0,
+                "mp": 30000.0
+            }
+        ],
+        "engines":
+        [
+            {
+                "Tmax": 100000.0,
+                "isp": 450.0
+            }
+        ],
+        "phases":
+        [
+            [[0],0]
+        ]
+    },
+    "target":
+    {
+        "lon": 0.0,
+        "lat": 0.0,
+        "alt": 0.0,
+        "degrees":true,
+        "target_pos_UEN":
+        [
+            200.0,
+            0.0,
+            0.0
+        ],
+        "target_vel_UEN":
+        [
+            -15.0,
+            0.0,
+            0.0
+        ]
+    },
+    "opt":
+    {    
+        "evolve": true,
+        "objtype": "control",
+        "config":
+        {
+            "npts": [20],
+            "nlopt_alg": "slsqp",
+            "verbosity": 20,
+            "c_tol": 0.01,
+            "xtol_rel": 0.0,
+            "ftol_rel": 0.0,
+            "maxeval": 1000,
+            "use_mbh_wrapper": false,
+            "mbh":
+            {
+                "stop": 1,
+                "perturb": 0.005
+            }
+        },
+        "input":
+        {
+            "use_coast_guess": true,
+            "coast_times":[800.0],
+            "guess_from_file": false,
+            "in_file": "Xout.json"
+        },
+        "bounds":
+        {
+            "lo":
+            {
+                "T": [50.0],
+                "eta": [0.2],
+                "nu0": -15.0
+            },
+            "hi":
+            {
+                "T": [1500.0],
+                "eta": [0.9],
+                "nu0": -15.0
+            }
+        },
+        "output":
+        {
+            "plot_traj": true,
+            "write_X": true,
+            "only_write_feasible": false,
+            "write_sum": true,
+            "write_csv": true,
+            "file_X_out": "Xout.json",
+            "file_sum_out": "summary.json",
+            "file_csv_out": "OUT.csv"
+        }
+    }
+}

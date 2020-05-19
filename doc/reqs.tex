@@ -1,0 +1,96 @@
+\subsection{Required User Function Definitions}
+A user must specify the following, for each trajectory leg:
+\begin{itemize}
+\item $\vec{X}$, the structure of the state vector,
+\item $\vec{U}$, the structure of the control vector,
+\item $\vec{f}(\vec{X},\vec{U})$, the system dynamics of a collocation node,
+\item $J(\vec{L}_1, \dots, \vec{L}_P)$, objective as a function of all trajectory legs,
+\item $\vec{g}_{0}(\vec{L}_1, \dots, \vec{L}_P)$, initial boundary constraint of this specific leg as a function of all trajectory legs,
+\item $\vec{g}_{f}(\vec{L}_1, \dots, \vec{L}_P)$, final boundary constraint of this specific leg as a function of all trajectory legs,
+\item $\vec{h}_e(\vec{L}_1, \dots, \vec{L}_P)$, the path equality constraints at each node in the trajectory leg, including:
+\begin{itemize}
+\item Thrust direction vector unity magnitude constraints,
+\end{itemize}
+\item $\vec{h}_i(\vec{L}_1, \dots, \vec{L}_P)$, the path inequality constraints at each node in the trajectory leg,  including:
+\begin{itemize}
+\item Throttle magnitude constraints,
+\item Altitude restrictions,
+\end{itemize}
+\item $t_{lb} \leq T \leq t_{ub}$, time bound for specific trajectory leg,
+\item $\vec{X}_{lb} \leq \vec{X} \leq \vec{X}_{ub}$, state bound for each collocation node,
+\item $\vec{U}_{lb} \leq \vec{U} \leq \vec{U}_{ub}$, control bound for each collocation node,
+\item Partials:
+\begin{itemize}
+\item $X = \pdv{J}{(\vec{L}_1, \dots, \vec{L}_P)}$, objective wrt. trajectory,
+\item $A = \pdv{\vec{f}}{\vec{X}}$, dynamics wrt. state,
+\item $B = \pdv{\vec{f}}{\vec{U}}$, dynamics wrt. control,
+\item $C_0 = \pdv{\vec{g}_0}{(\vec{L}_1, \dots, \vec{L}_P)}$, initial boundary constraint wrt. trajectory,
+\item $C_f = \pdv{\vec{g}_f}{(\vec{L}_1, \dots, \vec{L}_P)}$, final boundary constraint wrt. trajectory,
+\item $D_e = \pdv{\vec{h}}{(\vec{L}_1, \dots, \vec{L}_P)}$, path equality constraint wrt. trajectory,
+\item $D_i = \pdv{\vec{h}}{(\vec{L}_1, \dots, \vec{L}_P)}$, path inequality constraint wrt. trajectory,
+\end{itemize}
+\end{itemize}
+\newpage
+\subsection{Decision Vector Structure}
+Let's configure an example of a burn-coast-burn ($P=3$) lunar descent trajectory. Each leg will have $N=15$ collocation nodes. Each collocation node will consist of a state vector of 7 elements (position, velocity, mass), and a control vector of 4 elements (thrust unit direction, throttle). Each collocation node will be combined from the state and control vector in the following fashion:
+\begin{equation}
+\vec{C}_k = 
+\underset{(7) \times (1)}{
+\begin{bmatrix}
+\vec{R} \\ \vec{V} \\ m \\ \vec{u} \\ \eta
+\end{bmatrix}
+}
+\end{equation}
+Note that the constraint to normalize the control vector direction $\vec{u} = \hat{u}$ will be set in the path constraints. An entire trajectory leg $i$ of $P$ with $N$ collocation points is constructed as:
+\begin{equation}
+\vec{L}_i = 
+\underset{(1 + 7N_i) \times (1)}{
+\begin{bmatrix}
+T \\ \vec{C}_1 \\ \vec{C}_2 \\ \vdots \\ \vec{C}_N
+\end{bmatrix}
+}
+\end{equation} 
+The entire decision vector, i.e. the entire trajectory, is then configured as:
+\begin{equation}
+\vec{O} = 
+\underset{(P+7P(N_1 + ... + N_P)) \times (1)}{
+\begin{bmatrix}
+\vec{L}_1 \\ \vec{L}_2 \\ \vdots \\ \vec{L}_P
+\end{bmatrix}
+}
+\end{equation}
+The system dynamics of a collocation node:
+\begin{equation}
+\vec{f} ( \vec{C} ) = \vec{f}(\vec{X},\vec{U}) = 
+\underset{(7) \times (1)}{
+\begin{bmatrix}
+\vec{V} \\
+\frac{T_m \eta}{m} \hat{u} + \frac{\mu}{R^3}\vec{R} \\
+\frac{T_m \eta}{g_0 I_{sp}}
+\end{bmatrix}
+}
+\end{equation}
+The entire fitness and constraint vector for one specific trajectory leg:
+\begin{equation}
+\vec{F} = 
+\underset{() \times (7)}{
+\begin{bmatrix}
+J(\vec{L}_1, \dots, \vec{L}_P) \\
+\vec{g}_{0}(\vec{L}_1, \dots, \vec{L}_P) \\
+\vec{g}_{f}(\vec{L}_1, \dots, \vec{L}_P) \\
+\vec{\Delta}(\vec{L}_1, \dots, \vec{L}_P) \\
+\vec{h}_e(\vec{L}_1, \dots, \vec{L}_P) \\ 
+\vec{h}_i(\vec{L}_1, \dots, \vec{L}_P)
+\end{bmatrix}
+}
+\end{equation}
+
+
+
+
+
+
+
+
+
+
